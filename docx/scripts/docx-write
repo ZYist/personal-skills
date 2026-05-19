@@ -1,0 +1,73 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PACKAGE_DIR="$(dirname "$SCRIPT_DIR")/packages/docx"
+ORIGINAL_PWD="$(pwd)"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: docx-write <input.md> [output.docx] [options]"
+    echo ""
+    echo "Options:"
+    echo "  --style-config <file>   Path to JSON style config"
+    echo "  --body-font <font>      Override body font"
+    echo "  --body-size <pt>        Override body size"
+    echo "  --h1-size <pt>          Override Heading 1 size"
+    echo "  --image-max-width <in>  Override image max width"
+    exit 1
+fi
+
+INPUT_MD="$1"
+shift
+
+if [[ "$INPUT_MD" != /* ]]; then
+    INPUT_MD="$ORIGINAL_PWD/$INPUT_MD"
+fi
+
+OUTPUT_DOCX=""
+if [ $# -gt 0 ] && [[ "$1" != --* ]]; then
+    OUTPUT_DOCX="$1"
+    shift
+    if [[ "$OUTPUT_DOCX" != /* ]]; then
+        OUTPUT_DOCX="$ORIGINAL_PWD/$OUTPUT_DOCX"
+    fi
+fi
+
+EXTRA_ARGS=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --style-config)
+            EXTRA_ARGS+=("$1")
+            shift
+            if [ $# -eq 0 ]; then
+                echo "Error: --style-config requires a file path" >&2
+                exit 1
+            fi
+            STYLE_CONFIG="$1"
+            if [[ "$STYLE_CONFIG" != /* ]]; then
+                STYLE_CONFIG="$ORIGINAL_PWD/$STYLE_CONFIG"
+            fi
+            EXTRA_ARGS+=("$STYLE_CONFIG")
+            ;;
+        *)
+            EXTRA_ARGS+=("$1")
+            ;;
+    esac
+    shift
+done
+
+cd "$PACKAGE_DIR"
+
+if ! command -v uv &> /dev/null; then
+    echo "Error: uv is not installed. Please install uv first:" >&2
+    echo "  curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
+    exit 1
+fi
+
+uv sync --quiet
+
+if [ -n "$OUTPUT_DOCX" ]; then
+    uv run python main.py write "$INPUT_MD" "$OUTPUT_DOCX" "${EXTRA_ARGS[@]}"
+else
+    uv run python main.py write "$INPUT_MD" "${EXTRA_ARGS[@]}"
+fi

@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "prompt": "帮我把 report.docx 转成 Markdown 格式",
+    "expected": "调用 docx-read 脚本，输出 .md 文件和附件目录"
+  },
+  {
+    "id": 2,
+    "prompt": "把这个 Markdown 文件生成为 Word 文档，标题用16号字，正文用12号字",
+    "expected": "生成样式 JSON 或使用 CLI 参数，调用 docx-write 脚本输出 .docx"
+  },
+  {
+    "id": 3,
+    "prompt": "我有一份会议纪要的 docx，需要提取里面的表格数据，然后生成一份新的汇总报告 docx",
+    "expected": "先读取 docx 提取数据，再用 docx-write 生成新文档，展示完整链路"
+  }
+]

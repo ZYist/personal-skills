@@ -1,0 +1,39 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PACKAGE_DIR="$(dirname "$SCRIPT_DIR")/packages/excel"
+
+ORIGINAL_PWD="$(pwd)"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: excel-reader <excel_file> [sheet_name]"
+    echo ""
+    echo "Arguments:"
+    echo "  excel_file  - Path to the Excel file (.xlsx or .xlsm)"
+    echo "  sheet_name  - Optional: Name of specific sheet to read"
+    echo ""
+    echo "Output:"
+    echo "  Markdown: <source_dir>/<filename>.excel_reader.md"
+    echo "  JSON:     <source_dir>/<filename>.excel_reader.json"
+    exit 1
+fi
+
+EXCEL_FILE="$1"
+SHEET_NAME="${2:-}"
+
+if [[ "$EXCEL_FILE" != /* ]]; then
+    EXCEL_FILE="$ORIGINAL_PWD/$EXCEL_FILE"
+fi
+
+cd "$PACKAGE_DIR"
+
+if ! command -v uv &> /dev/null; then
+    echo "Error: uv is not installed. Please install uv first:" >&2
+    echo "  curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
+    exit 1
+fi
+
+uv sync --quiet
+
+uv run python main.py "$EXCEL_FILE" ${SHEET_NAME:+"$SHEET_NAME"}

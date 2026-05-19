@@ -1,0 +1,65 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PACKAGE_DIR="$(dirname "$SCRIPT_DIR")/packages/excel"
+
+ORIGINAL_PWD="$(pwd)"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: excel-writer <input.json> [output.xlsx]"
+    echo ""
+    echo "Arguments:"
+    echo "  input.json   - JSON file describing Excel structure"
+    echo "  output.xlsx  - Optional: output Excel file path (default: <input_stem>.xlsx)"
+    echo ""
+    echo "JSON Format:"
+    echo '  {'
+    echo '    "sheets": ['
+    echo '      {'
+    echo '        "name": "Sheet1",'
+    echo '        "title": "Report Title",'
+    echo '        "headers": ["Col1", "Col2"],'
+    echo '        "data": [["val1", "val2"]],'
+    echo '        "column_widths": [15, 20],'
+    echo '        "merge_cells": ["A1:B2"]'
+    echo '      }'
+    echo '    ]'
+    echo '  }'
+    echo ""
+    echo "Fields:"
+    echo "  name           - Optional: sheet name (default: Sheet1)"
+    echo "  title          - Optional: title row text"
+    echo "  headers        - Optional: column headers"
+    echo "  data           - Required: 2D array of cell values"
+    echo "  column_widths  - Optional: array of column widths"
+    echo "  merge_cells    - Optional: array of merge ranges"
+    exit 1
+fi
+
+INPUT_FILE="$1"
+OUTPUT_FILE="${2:-}"
+
+if [[ "$INPUT_FILE" != /* ]]; then
+    INPUT_FILE="$ORIGINAL_PWD/$INPUT_FILE"
+fi
+
+if [ -n "$OUTPUT_FILE" ] && [[ "$OUTPUT_FILE" != /* ]]; then
+    OUTPUT_FILE="$ORIGINAL_PWD/$OUTPUT_FILE"
+fi
+
+cd "$PACKAGE_DIR"
+
+if ! command -v uv &> /dev/null; then
+    echo "Error: uv is not installed. Please install uv first:" >&2
+    echo "  curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
+    exit 1
+fi
+
+uv sync --quiet
+
+if [ -n "$OUTPUT_FILE" ]; then
+    uv run python writer.py "$INPUT_FILE" "$OUTPUT_FILE"
+else
+    uv run python writer.py "$INPUT_FILE"
+fi
