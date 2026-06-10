@@ -1,7 +1,6 @@
 ---
-name: free-cf-temp-email
-description: |
-  Deploy a free temporary email system on Cloudflare using Workers, D1, Pages, and Email Routing. Use this skill when the user wants to set up a temp mail system, disposable email service, or Cloudflare-based email receiving platform. Covers the full workflow: free domain registration, DNS hosting, D1 database, Worker backend, Email Routing, Pages frontend, admin config, user registration, and send mail setup. Also covers DigitalPlat free domain (*.dpdns.org) setup.
+name: free-cf-temp-email-shouffin
+description: "基于 Cloudflare 免费套餐（Workers + D1 + Pages + Email Routing）部署临时邮箱系统。涵盖完整流程：免费域名注册、DNS 托管、D1 数据库、Worker 后端、邮件路由、Pages 前端、管理后台、用户注册及发信配置，支持 DigitalPlat 免费域名（*.dpdns.org）。触发词：临时邮箱、临时邮件、temp email、disposable email"
 ---
 
 # Free Cloudflare Temporary Email Deployment Guide

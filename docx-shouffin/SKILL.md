@@ -1,5 +1,5 @@
 ---
-name: docx
+name: docx-shouffin
 description: 用于读取和创建 Word 文档（.docx）。读取时提取为 Markdown 并导出附件；创建时从本地 Markdown 生成带样式的 docx，支持标题、正文、表格、图片与常见文本样式配置。
 ---
 

@@ -1,11 +1,6 @@
 ---
 name: skill-forge-shouffin
-description: >
-  Use when creating a new skill, generating skill folder structure, writing SKILL.md,
-  designing skill description, building cross-tool compatible skills, or scaffolding
-  agent skills. Activate when user says "create a skill", "generate skill", "make a skill",
-  "build skill", "skill scaffold", "skill template", "写一个skill", "创建skill", "生成skill",
-  "做一个skill", "skill 生成器", "skill 工厂", or any request to produce a new skill.
+description: "Skill 脚手架生成器：快速创建新的 Agent Skill，自动生成文件夹结构、SKILL.md、描述设计及跨工具兼容配置。触发词：创建skill、生成skill、写一个skill、skill生成器、skill工厂、create skill、skill scaffold"
 ---
 
 # Skill Forge — Skill 生成器

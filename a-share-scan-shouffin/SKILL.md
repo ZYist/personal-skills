@@ -1,5 +1,5 @@
 ---
-name: a-share-scan
+name: a-share-scan-shouffin
 description: "A股全市场盘面扫描：实时行情筛选Top30 + 逐只quick-scan + 自动深度分析 + HTML合并 + Cloudflare Tunnel公网分享。输出日期文件夹含全部报告。触发词：扫描/盘面/行情/A股/股票/扫盘/选股/看盘/ market scan"
 argument-hint: "[可选：板块/概念关键词，如 半导体 / 光伏 / AI]"
 allowed-tools:
