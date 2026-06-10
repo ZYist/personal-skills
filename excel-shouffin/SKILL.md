@@ -9,12 +9,20 @@ description: "用于读取和创建 Excel 文件。读取时支持 .xlsx/.xlsm �
 
 ## 前置要求
 
-**重要**：本技能依赖 `uv` 进行 Python 依赖管理。如果用户系统没有安装 `uv`，请停止任务执行并告知用户：
+本技能依赖 `uv` 管理 Python 依赖。若系统未安装 `uv`，**停止任务执行并告知用户**：
 
 > 当前系统未安装 `uv`，无法执行此技能。请先安装 `uv`：
 > ```bash
 > curl -LsSf https://astral.sh/uv/install.sh | sh
 > ```
+
+## 依赖要求
+
+- Python 3.12+
+- openpyxl
+- uv（用于依赖管理）
+
+首次运行会自动初始化虚拟环境并安装依赖。
 
 ## 何时使用
 
@@ -24,14 +32,6 @@ description: "用于读取和创建 Excel 文件。读取时支持 .xlsx/.xlsm �
 - 需要读取特定 sheet 或全部 sheets
 - 需要根据数据创建带样式的 Excel 文件
 - 需要将结构化数据导出为 Excel
-
-## 依赖要求
-
-- Python 3.12+
-- openpyxl
-- uv（用于依赖管理）
-
-首次运行会自动初始化虚拟环境并安装依赖。
 
 ## 功能一：读取 Excel
 
@@ -59,7 +59,7 @@ scripts/excel-reader.ps1 <excel_file> [sheet_name]
 | `excel_file` | 是 | Excel 文件路径（.xlsx 或 .xlsm） |
 | `sheet_name` | 否 | 指定读取的 sheet 名称，不指定则读取所有 |
 
-### 输出格式
+### 输出
 
 执行成功后，会在**源文件所在目录**生成两个文件：
 ```
@@ -244,7 +244,7 @@ scripts/excel-writer data.json
 # Success: /path/to/data.xlsx
 ```
 
-### AI 使用模式
+## AI 使用约定
 
 当用户需要将任意数据创建为 Excel 时：
 
@@ -253,7 +253,7 @@ scripts/excel-writer data.json
 3. **调用脚本**：执行 `scripts/excel-writer .tmp/data.json [output.xlsx]`
 4. **告知用户**：输出 Excel 文件路径
 
-### 🔴 检查点
+## 🔴 检查点
 
 | 时机 | 动作 | 原因 |
 |------|------|------|
