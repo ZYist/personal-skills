@@ -22,13 +22,15 @@ description: "Skill 脚手架生成器：快速创建新的 Agent Skill，自动
 | **验证已有 skill** | `references/gotchas.md` | → `workflows/validate-skill.md` |
 | **Other / 未列出** | Always Read 两文件 | 检查 `workflows/` 找最近匹配 |
 
-## Known Gotchas
+## Known Gotchas（反例与黑名单）
 
-- Description 写不好 = skill 不存在（Agent 找不到门）→ `references/gotchas.md#description-fail`
-- 单文件 > 500 行且内容混在一起 → Agent 读不到关键内容 → `references/gotchas.md#monolith-trap`
-- 薄壳缺 GEMINI.md → Gemini 完全失明 → `references/gotchas.md#blind-harness`
-- "就这一次跳过 AAR" → 知识永远不会录入 → `references/gotchas.md#skip-aar`
-- 预制内容进 templates → 所有下游项目长得一样 → `references/gotchas.md#template-overreach`
+| # | 不要做什么 | 为什么 | 正确做法 |
+|---|-----------|--------|---------|
+| 1 | ❌ Description 写不好 | skill 不存在（Agent 找不到门） | 按 `workflows/design-description.md` 写 | → `references/gotchas.md#description-fail` |
+| 2 | ❌ 单文件 > 500 行且内容混在一起 | Agent 读不到关键内容 | 严格目录分离 → `references/gotchas.md#monolith-trap` |
+| 3 | ❌ 薄壳缺 GEMINI.md | Gemini 完全失明 | 按模板补全 harness 文件 → `references/gotchas.md#blind-harness` |
+| 4 | ❌ "就这一次跳过 AAR" | 知识永远不会录入 | 每次必做 AAR → `references/gotchas.md#skip-aar` |
+| 5 | ❌ 预制内容进 templates | 所有下游项目长得一样 | templates 只放骨架 → `references/gotchas.md#template-overreach` |
 
 ## 模板
 
