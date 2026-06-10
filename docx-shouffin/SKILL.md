@@ -1,6 +1,6 @@
 ---
 name: docx-shouffin
-description: "用于读取和创建 Word 文档（.docx）。读取时提取为 Markdown 并导出附件；创建时从本地 Markdown 生成带样式的 docx，支持标题、正文、表格、图片与常见文本样式配置。触发词：Word、docx、Word文档、读取Word、创建Word、导出Word、word文档、doc"
+description: "用于读取和创建 Word 文档（.docx）。读取时提取为 Markdown 并导出附件；创建时从本地 Markdown 生成带样式的 docx，支持标题、正文、表格、图片与常见文本样式配置。触发词：Word、docx、Word文档、读取Word、创建Word、导出Word、word文档、read docx、create word"
 ---
 
 # Docx — Word 文档读写
@@ -9,11 +9,19 @@ description: "用于读取和创建 Word 文档（.docx）。读取时提取为 
 
 ## 前置要求
 
-本技能依赖 `uv` 管理 Python 依赖。若系统未安装 `uv`，应先安装：
+本技能依赖 `uv` 管理 Python 依赖。若系统未安装 `uv`，**停止任务执行并告知用户**：
 
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+> 当前系统未安装 `uv`，无法执行此技能。请先安装 `uv`：
+> ```bash
+> curl -LsSf https://astral.sh/uv/install.sh | sh
+> ```
+
+## 依赖要求
+
+- Python 3.12+
+- `python-docx`
+- `markdown-it-py`
+- `uv`
 
 ## 何时使用
 
@@ -23,6 +31,15 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 - 需要通过默认样式、CLI 参数或 JSON 配置控制 Word 文档格式
 
 ## 功能一：读取 Docx
+
+### 工作流程
+
+1. 确认文件路径（.docx 格式）
+2. 确认输出目录（默认：`docs/extracted`）
+3. 调用脚本，生成 Markdown 文件和附件目录
+4. 展示 Markdown 内容供用户查看
+
+### 快速开始
 
 ```bash
 # Bash/Linux/macOS
@@ -39,14 +56,24 @@ scripts/docx-read.ps1 <input.docx> [output_dir]
 | `input.docx` | 是 | Word 文件路径（.docx 格式） |
 | `output_dir` | 否 | 输出目录（默认：`docs/extracted`） |
 
-### 读取输出
+### 输出
 
-- `<output_dir>/<filename>.md`
-- `<output_dir>/<filename>/` 附件目录
-
-默认输出目录：`docs/extracted`
+| 输出 | 路径 | 内容 |
+|------|------|------|
+| Markdown | `<output_dir>/<filename>.md` | 完整文本内容，图片引用为相对路径 |
+| 附件目录 | `<output_dir>/<filename>/` | 提取的图片和其他嵌入文件 |
 
 ## 功能二：创建 Docx
+
+### 工作流程
+
+1. 确认 Markdown 源文件路径
+2. 确认输出路径和样式需求
+3. 按需生成 JSON 样式配置或追加 CLI 参数
+4. 调用脚本生成 `.docx`
+5. 告知用户输出文件路径
+
+### 快速开始
 
 ```bash
 # Bash/Linux/macOS
@@ -121,17 +148,18 @@ scripts/docx-write report.md report.docx --style-config .tmp/docx-style.json
   "code_block": { "font": "Consolas", "size_pt": 10, "bg_color": "#F0F0F0" },
   "table": { "header_bold": true, "header_bg": "#D9E2F3", "border": true }
 }
+```
 
 ## AI 使用约定
 
 若用户没有直接提供 Markdown，而是要求生成一份 docx 报告：
 
-1. 先在 `docs/` 或 `.tmp/` 生成 Markdown 文件
+1. 先在 `.tmp/` 生成 Markdown 文件
 2. 默认直接使用内置样式
 3. 用户明确要求字体、字号、图片或表格格式时，再生成 JSON 配置文件或追加 CLI 参数
 4. 最后调用 `scripts/docx-write` 生成 `.docx`
 
-### 🔴 检查点
+## 🔴 检查点
 
 | 时机 | 动作 | 原因 |
 |------|------|------|
@@ -148,26 +176,6 @@ scripts/docx-write report.md report.docx --style-config .tmp/docx-style.json
 | 3 | 不要跳过样式配置直接输出 | 默认样式可能与用户预期不符 | 🛑 先展示样式摘要，用户确认后再生成 |
 | 4 | 不要支持 `.doc` 格式 | 旧版二进制格式完全不同 | 提示用户先另存为 `.docx` |
 | 5 | 不要忽略图片提取失败 | EMF/WMF 图片会静默丢失 | 标注跳过的图片，告知用户 |
-
-## 依赖要求
-
-- Python 3.12+
-- `python-docx`
-- `markdown-it-py`
-- `uv`
-
-## 示例
-
-```bash
-# 读取 docx
-scripts/docx-read report.docx
-
-# 创建 docx
-scripts/docx-write report.md report.docx
-
-# 使用样式配置
-scripts/docx-write report.md report.docx --style-config .tmp/docx-style.json
-```
 
 ## 常见问题
 
@@ -194,6 +202,7 @@ Error: python-docx not found
 ```
 
 首次运行时 `uv` 会自动安装依赖。如果失败，手动执行：
+
 ```bash
 cd packages/docx && uv sync
 ```
@@ -213,21 +222,3 @@ Error: Invalid JSON in style config
 ### 图片提取失败
 
 如果 docx 中的图片格式不常见（如 EMF/WMF），可能无法提取。脚本会跳过这些图片并在输出中标注。
-
-## 输出说明
-
-### 读取输出
-
-| 输出 | 路径 | 内容 |
-|------|------|------|
-| Markdown | `<output_dir>/<filename>.md` | 完整文本内容，图片引用为相对路径 |
-| 附件目录 | `<output_dir>/<filename>/` | 提取的图片和其他嵌入文件 |
-
-默认 `output_dir` 为 `docs/extracted`。
-
-### 创建输出
-
-| 场景 | 输出路径 |
-|------|----------|
-| 指定输出路径 | 用户指定的路径 |
-| 未指定 | 与输入 `.md` 同目录，同名 `.docx` |

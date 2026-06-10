@@ -1,6 +1,6 @@
 ---
 name: excel-shouffin
-description: 用于读取和创建 Excel 文件。读取时支持 .xlsx/.xlsm 提取数据为 Markdown 和 JSON 格式；创建时通过 JSON 描述表格结构生成带样式的 Excel。当用户提到 Excel、xlsx、电子表格、表格数据、创建 Excel、导出 Excel 时触发。
+description: "用于读取和创建 Excel 文件。读取时支持 .xlsx/.xlsm 提取数据为 Markdown 和 JSON 格式；创建时通过 JSON 描述表格结构生成带样式的 Excel。触发词：Excel、xlsx、电子表格、表格数据、创建Excel、导出Excel、read excel、create spreadsheet"
 ---
 
 # Excel — 电子表格读写
@@ -25,7 +25,13 @@ description: 用于读取和创建 Excel 文件。读取时支持 .xlsx/.xlsm �
 - 需要根据数据创建带样式的 Excel 文件
 - 需要将结构化数据导出为 Excel
 
----
+## 依赖要求
+
+- Python 3.12+
+- openpyxl
+- uv（用于依赖管理）
+
+首次运行会自动初始化虚拟环境并安装依赖。
 
 ## 功能一：读取 Excel
 
@@ -94,8 +100,6 @@ cat data.excel_reader.md
 **数据类型识别**：自动识别 string、number、boolean、date、empty、merged 类型。
 
 **多 Sheet 支持**：不指定 sheet_name 时读取所有 sheets，指定时只读取指定 sheet。
-
----
 
 ## 功能二：创建 Excel
 
@@ -267,16 +271,6 @@ scripts/excel-writer data.json
 | 4 | 不要在 JSON 中混用数字字符串和纯文本而不标注 | 类型自动转换可能导致意外结果 | 确认数据类型符合预期（见"数据类型自动转换"章节） |
 | 5 | 不要忽略文件被占用的错误 | 强制写入会损坏文件 | 提示用户关闭 Excel 后重试 |
 
----
-
-## 依赖要求
-
-- Python 3.12+
-- openpyxl
-- uv（用于依赖管理）
-
-首次运行会自动初始化虚拟环境并安装依赖。
-
 ## 常见问题
 
 ### 文件不存在（读取）
@@ -341,19 +335,3 @@ Error: Permission denied: /path/to/output.xlsx
 ```
 
 目标文件可能被 Excel 或其他程序打开。关闭后重试。
-
-## 输出说明
-
-### 读取输出
-
-| 输出 | 路径 | 内容 |
-|------|------|------|
-| Markdown | `<源目录>/<文件名>.excel_reader.md` | 格式化表格，适合直接阅读 |
-| JSON | `<源目录>/<文件名>.excel_reader.json` | 完整元数据（合并单元格、数据类型） |
-
-### 创建输出
-
-| 场景 | 输出路径 |
-|------|----------|
-| 指定输出路径 | 用户指定的路径 |
-| 未指定 | 与输入 JSON 同目录，同名 `.xlsx` |
