@@ -1,0 +1,378 @@
+// analyze-session.test.js — node:test suite for the Session Analyst parser.
+// Stdlib only (node:test + node:assert + fs/os/path). No third-party runner.
+const test = require('node:test');
+const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const {
+  parseSession,
+  collectToolCalls,
+  renderReport,
+  truncateLines,
+  verifyFidelity,
+  MAX_OUTPUT_LINES,
+  MAX_INPUT_LINES,
+  MAX_THINKING_LINES,
+  deriveProjectSlug,
+  resolveTranscriptPath,
+  findNewestSession,
+} = require('./analyze-session.js');
+
+// Build a JSONL file in a temp dir from an array of line objects; return its path.
+function writeFixture(lines) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'session-analyst-'));
+  const file = path.join(dir, 'fixture.jsonl');
+  fs.writeFileSync(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n', 'utf8');
+  return file;
+}
+
+test('parseSession keeps only user/assistant lines in order and normalizes assistant blocks (PARSE-01/02/04)', () => {
+  const fixture = writeFixture([
+    {
+      type: 'user',
+      message: { role: 'user', content: 'hello there' },
+      uuid: 'u1', parentUuid: null, timestamp: '2026-06-17T10:00:00Z',
+      sessionId: 'sess-abc', cwd: 'D:\\workspace\\x', gitBranch: 'master', version: '1.0',
+    },
+    {
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Hi there' },
+          { type: 'tool_use', name: 'Read', input: { file_path: '/a' }, id: 'tu_1' },
+          { type: 'thinking', thinking: 'pondering the request' },
+        ],
+        model: 'claude-test-model',
+      },
+      uuid: 'a1', parentUuid: 'u1', timestamp: '2026-06-17T10:00:01Z',
+      sessionId: 'sess-abc', cwd: 'D:\\workspace\\x', gitBranch: 'master', version: '1.0',
+    },
+    { type: 'mode', mode: 'default' }, // must be excluded
+  ]);
+
+  const { meta, messages } = parseSession(fixture);
+
+  // PARSE-01: non-conversation lines excluded
+  assert.strictEqual(messages.length, 2, 'exactly two conversation entries (mode line excluded)');
+
+  // PARSE-04: input line order preserved
+  assert.strictEqual(messages[0].role, 'user');
+  assert.strictEqual(messages[0].content, 'hello there', 'user string prompt preserved');
+
+  assert.strictEqual(messages[1].role, 'assistant');
+  const blocks = messages[1].content;
+  assert.strictEqual(blocks.length, 3, 'three assistant blocks in order: text, tool_use, thinking');
+  // PARSE-02: text block
+  assert.deepStrictEqual(blocks[0], { type: 'text', text: 'Hi there' });
+  // PARSE-02: tool_use normalized to {type, id, name, input}
+  assert.deepStrictEqual(blocks[1], { type: 'tool_use', id: 'tu_1', name: 'Read', input: { file_path: '/a' } });
+  // PARSE-02: thinking block
+  assert.deepStrictEqual(blocks[2], { type: 'thinking', thinking: 'pondering the request' });
+
+  // meta
+  assert.strictEqual(meta.sessionId, 'sess-abc');
+  assert.deepStrictEqual(meta.models, ['claude-test-model'], 'models is an array with the assistant model');
+});
+
+test('parseSession normalizes user tool_result blocks and collectToolCalls links tool_use↔tool_result (PARSE-03)', () => {
+  const fixture = writeFixture([
+    {
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [
+          { type: 'tool_use', id: 'tu_9', name: 'Bash', input: { command: 'ls' } },
+          { type: 'tool_use', id: 'tu_8', name: 'Read', input: { file_path: '/x' } },
+        ],
+        model: 'claude-test-model',
+      },
+      uuid: 'a1', parentUuid: null, timestamp: '2026-06-17T10:00:01Z',
+      sessionId: 'sess-xyz', cwd: 'D:\\proj', gitBranch: 'master', version: '1.0',
+    },
+    {
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [
+          { type: 'tool_result', tool_use_id: 'tu_9', content: [{ type: 'text', text: 'a\nb' }], is_error: false },
+        ],
+      },
+      uuid: 'u2', parentUuid: 'a1', timestamp: '2026-06-17T10:00:02Z',
+      sessionId: 'sess-xyz', cwd: 'D:\\proj', gitBranch: 'master', version: '1.0',
+    },
+  ]);
+
+  const { messages } = parseSession(fixture);
+
+  // The user tool_result is normalized to {type, tool_use_id, text, is_error}.
+  const userContent = messages[1].content;
+  assert.ok(Array.isArray(userContent), 'user tool_result line content is an array');
+  assert.deepStrictEqual(userContent[0], {
+    type: 'tool_result', tool_use_id: 'tu_9', text: 'a\nb', is_error: false,
+  });
+
+  // collectToolCalls: one entry per tool_use, in appearance order, linked by id.
+  const calls = collectToolCalls(messages);
+  assert.strictEqual(calls.length, 2, 'one entry per tool_use, in appearance order');
+  assert.deepStrictEqual(calls[0], {
+    toolUse: { id: 'tu_9', name: 'Bash', input: { command: 'ls' } },
+    toolResult: { text: 'a\nb', is_error: false },
+  });
+  // tu_8 has no matching tool_result in the transcript → null.
+  assert.strictEqual(calls[1].toolUse.id, 'tu_8');
+  assert.strictEqual(calls[1].toolResult, null);
+});
+
+test('collectToolCalls: typed-prompt user lines stay strings; mixed arrays link only tool_results', () => {
+  const fixture = writeFixture([
+    {
+      type: 'user',
+      message: { role: 'user', content: 'a typed prompt' },
+      uuid: 'u0', parentUuid: null, timestamp: '2026-06-17T10:00:00Z',
+      sessionId: 'sess-mix', cwd: 'D:\\p', gitBranch: 'master', version: '1.0',
+    },
+    {
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id: 'tu_7', name: 'Glob', input: { pattern: '*.js' } }],
+        model: 'claude-test-model',
+      },
+      uuid: 'a1', parentUuid: 'u0', timestamp: '2026-06-17T10:00:01Z',
+      sessionId: 'sess-mix', cwd: 'D:\\p', gitBranch: 'master', version: '1.0',
+    },
+    {
+      // Mixed array: a stray text block AND a tool_result. Only the tool_result links.
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'ignored note' },
+          { type: 'tool_result', tool_use_id: 'tu_7', content: [{ type: 'text', text: 'hit' }], is_error: false },
+        ],
+      },
+      uuid: 'u1', parentUuid: 'a1', timestamp: '2026-06-17T10:00:02Z',
+      sessionId: 'sess-mix', cwd: 'D:\\p', gitBranch: 'master', version: '1.0',
+    },
+  ]);
+
+  const { messages } = parseSession(fixture);
+
+  // A string user prompt stays a string (not treated as a tool_result).
+  assert.strictEqual(typeof messages[0].content, 'string');
+
+  const calls = collectToolCalls(messages);
+  assert.strictEqual(calls.length, 1, 'only the tool_use links');
+  assert.deepStrictEqual(calls[0].toolUse, { id: 'tu_7', name: 'Glob', input: { pattern: '*.js' } });
+  assert.deepStrictEqual(calls[0].toolResult, { text: 'hit', is_error: false });
+});
+
+test('renderReport: conversation replay + tool summary + truncated detail + ✗ on error (CONVO-01/03, TOOLS-01/02/03)', () => {
+  const longResult = Array.from({ length: 55 }, (_, i) => `line${i + 1}`).join('\n');
+  const meta = {
+    sessionId: 'sess-render', cwd: 'D:\\proj', gitBranch: 'master',
+    firstTs: '2026-06-17T10:00:00Z', lastTs: '2026-06-17T10:00:04Z',
+    models: ['claude-test-model'],
+  };
+  const messages = [
+    { role: 'user', uuid: 'u1', timestamp: '2026-06-17T10:00:00Z', model: undefined, content: 'hello' },
+    {
+      role: 'assistant', uuid: 'a1', timestamp: '2026-06-17T10:00:01Z', model: 'claude-test-model',
+      content: [
+        { type: 'text', text: 'hi' },
+        { type: 'tool_use', id: 'tu_1', name: 'Read', input: { file_path: '/x' } },
+        { type: 'thinking', thinking: 'ponder' },
+      ],
+    },
+    { role: 'user', uuid: 'u2', timestamp: '2026-06-17T10:00:02Z', model: undefined, content: [{ type: 'tool_result', tool_use_id: 'tu_1', text: longResult, is_error: false }] },
+    { role: 'assistant', uuid: 'a2', timestamp: '2026-06-17T10:00:03Z', model: 'claude-test-model', content: [{ type: 'tool_use', id: 'tu_2', name: 'Bash', input: { command: 'bad' } }] },
+    { role: 'user', uuid: 'u3', timestamp: '2026-06-17T10:00:04Z', model: undefined, content: [{ type: 'tool_result', tool_use_id: 'tu_2', text: 'boom', is_error: true }] },
+  ];
+
+  const md = renderReport({ meta, messages });
+
+  // Four sections present and in order.
+  const idxTitle = md.indexOf('# Session Analysis');
+  const idxConvo = md.indexOf('## Conversation');
+  const idxSummary = md.indexOf('## Tool Call Summary');
+  const idxDetail = md.indexOf('## Tool Call Detail');
+  assert.notStrictEqual(idxTitle, -1, 'title present');
+  assert.ok(idxTitle < idxConvo, 'title before conversation');
+  assert.ok(idxConvo < idxSummary, 'conversation before summary');
+  assert.ok(idxSummary < idxDetail, 'summary before detail');
+
+  // Conversation: role headers with timestamps, prompt, assistant text, thinking blockquote, interleaved result.
+  assert.ok(md.includes('👤 User — 2026-06-17T10:00:00Z'), 'user header with ts');
+  assert.ok(md.includes('🤖 Assistant — 2026-06-17T10:00:01Z (claude-test-model)'), 'assistant header with ts + model');
+  assert.ok(md.includes('hello'), 'user prompt present');
+  assert.ok(md.includes('hi'), 'assistant text present');
+  assert.ok(md.includes('<details><summary>💭 thinking</summary>'), 'thinking rendered as collapsed <details>');
+  assert.ok(!md.includes('> **thinking:'), 'old blockquote shape removed');
+  assert.ok(md.includes('Tool result'), 'tool result interleaved in conversation');
+
+  // Tool Call Summary table: Read 1/1/0, Bash 1/0/1.
+  const summarySection = md.slice(idxSummary, idxDetail);
+  assert.ok(summarySection.includes('| Read | 1 | 1 | 0 |'), 'Read: 1 call, 1 success, 0 failures');
+  assert.ok(summarySection.includes('| Bash | 1 | 0 | 1 |'), 'Bash: 1 call, 0 successes, 1 failure');
+
+  // Tool Call Detail: Read input + result truncated to 50 lines with +N marker; Bash ✗ + error text.
+  const detailSection = md.slice(idxDetail);
+  assert.ok(detailSection.includes(JSON.stringify({ file_path: '/x' })), 'Read full input present');
+  assert.ok(detailSection.includes('+5 more lines'), 'result truncated to MAX_OUTPUT_LINES with +N marker');
+  assert.ok(detailSection.includes('✗'), 'errored Bash call marked ✗');
+  assert.ok(detailSection.includes('boom'), 'error text present');
+});
+
+test('thinking blocks collapse into <details>, one per block, truncated at MAX_THINKING_LINES (CONVO-02)', () => {
+  // D-04: two thinking blocks in one assistant message → two independent <details>.
+  // D-03: a >50-line thinking block is truncated via truncateLines(text, MAX_THINKING_LINES).
+  // D-02: default-collapsed — plain <details>, no open attribute.
+  const longThinking = Array.from({ length: 55 }, (_, i) => `think-line-${i + 1}`).join('\n');
+  const messages = [
+    {
+      role: 'assistant', uuid: 'a1', timestamp: '2026-06-17T10:00:01Z', model: 'claude-test-model',
+      content: [
+        { type: 'thinking', thinking: 'short one' },
+        { type: 'thinking', thinking: longThinking },
+      ],
+    },
+  ];
+  const md = renderReport({ meta: null, messages });
+
+  const detailsCount = (md.match(/<details><summary>💭 thinking<\/summary>/g) || []).length;
+  assert.strictEqual(detailsCount, 2, 'two thinking blocks → two independent <details>');
+  assert.ok(md.includes('+5 more lines'), 'long (55-line) thinking truncated to 50 with +5 marker');
+  assert.ok(!md.includes('<details open'), 'details collapsed by default — no open attribute (D-02)');
+  assert.ok(!md.includes('> **thinking:'), 'old blockquote shape removed');
+});
+
+test('verifyFidelity: clean session → ok with 3 passing checks (D-08/D-09/D-10)', () => {
+  // Reuses collectToolCalls + messages; zero new deps (D-08). Three checks (D-09):
+  //   (a) tool-summary count == independent tool_use block count
+  //   (b) reported message count == parsed message count
+  //   (c) no-result tool count consistent
+  const messages = [
+    { role: 'user', uuid: 'u1', timestamp: 't1', model: undefined, content: 'go' },
+    {
+      role: 'assistant', uuid: 'a1', timestamp: 't2', model: 'm',
+      content: [
+        { type: 'tool_use', id: 'tu_1', name: 'Read', input: {} },
+        { type: 'tool_use', id: 'tu_2', name: 'Bash', input: {} },
+      ],
+    },
+    { role: 'user', uuid: 'u2', timestamp: 't3', model: undefined, content: [{ type: 'tool_result', tool_use_id: 'tu_1', text: 'ok', is_error: false }] },
+    { role: 'user', uuid: 'u3', timestamp: 't4', model: undefined, content: [{ type: 'tool_result', tool_use_id: 'tu_2', text: 'boom', is_error: true }] },
+  ];
+  const fid = verifyFidelity({ meta: { sessionId: 's' }, messages });
+
+  assert.strictEqual(fid.ok, true, 'clean session is ok');
+  assert.strictEqual(fid.checks.length, 3, 'exactly three checks');
+  assert.ok(fid.checks.every((c) => c.pass), 'all checks pass');
+  // Each check carries the {name, expected, actual, pass} contract.
+  for (const c of fid.checks) {
+    assert.ok(typeof c.name === 'string' && c.name.length > 0, 'check has a name');
+    assert.ok('expected' in c && 'actual' in c && typeof c.pass === 'boolean', 'check has expected/actual/pass');
+  }
+});
+
+test('verifyFidelity: duplicate tool_use id with no result → mismatch detected, ok:false (D-09/D-11)', () => {
+  // Honest divergence vector: two tool_use BLOCKS share id "X" with no result.
+  // collectToolCalls counts per-block (2 null entries), while the independent
+  // distinct-id walk sees one unmatched id ({"X"}). check (c) 2≠1 → ok:false.
+  const messages = [
+    {
+      role: 'assistant', uuid: 'a1', timestamp: 't1', model: 'm',
+      content: [
+        { type: 'tool_use', id: 'X', name: 'Read', input: {} },
+        { type: 'tool_use', id: 'X', name: 'Read', input: {} },
+      ],
+    },
+  ];
+  const fid = verifyFidelity({ meta: { sessionId: 's' }, messages });
+
+  assert.strictEqual(fid.ok, false, 'duplicate-id no-result mismatch → not ok');
+  const failed = fid.checks.filter((c) => !c.pass);
+  assert.ok(failed.length >= 1, 'at least one failing check is named');
+  assert.ok(failed.some((c) => /no-result/i.test(c.name)), 'the no-result check is the failing one');
+});
+
+test('truncation constants + truncateLines helper (TOOLS-03)', () => {
+  assert.strictEqual(MAX_OUTPUT_LINES, 50);
+  assert.strictEqual(MAX_INPUT_LINES, 200);
+  assert.strictEqual(MAX_THINKING_LINES, 50);
+  // Under the limit → unchanged.
+  assert.strictEqual(truncateLines('a\nb\nc', 50), 'a\nb\nc');
+  // Over the limit → first `max` lines + "+N more lines" marker.
+  const out = truncateLines(Array.from({ length: 53 }, (_, i) => `l${i}`).join('\n'), 50);
+  const outLines = out.split('\n');
+  assert.strictEqual(outLines.length, 51, '50 content lines + 1 marker line');
+  assert.strictEqual(outLines[outLines.length - 1], '+3 more lines');
+});
+
+test('deriveProjectSlug encodes cwd → projects slug (non-alnum → "-", case preserved) (TGT-01)', () => {
+  // Verified against the REAL transcript dir for this project.
+  assert.strictEqual(deriveProjectSlug('D:\\workspace\\调用分析skill'), 'D--workspace-----skill');
+  // Forward slashes and spaces also collapse to "-".
+  assert.strictEqual(deriveProjectSlug('/home/alice/my project'), '-home-alice-my-project');
+  // Plain ASCII Windows path.
+  assert.strictEqual(deriveProjectSlug('C:\\Users\\bob'), 'C--Users-bob');
+});
+
+test('resolveTranscriptPath points at ~/.claude/projects/<slug> (TGT-01)', () => {
+  const p = resolveTranscriptPath('D:\\workspace\\调用分析skill');
+  assert.ok(p.includes('D--workspace-----skill'), 'path contains the derived slug');
+  assert.ok(p.includes(path.join('.claude', 'projects')), 'path is under .claude/projects');
+});
+
+test('findNewestSession returns the newest-by-mtime .jsonl, ignoring other files (TGT-02)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sa-newest-'));
+  const oldFile = path.join(dir, 'old.jsonl');
+  const newerFile = path.join(dir, 'newer.jsonl');
+  const noise = path.join(dir, 'ignore.txt');
+  fs.writeFileSync(oldFile, '{}\n');
+  fs.writeFileSync(newerFile, '{}\n');
+  fs.writeFileSync(noise, 'not a session');
+  const past = new Date(Date.now() - 60000);
+  const now = new Date();
+  fs.utimesSync(oldFile, past, past);
+  fs.utimesSync(noise, past, past);
+  fs.utimesSync(newerFile, now, now);
+  assert.strictEqual(path.basename(findNewestSession(dir)), 'newer.jsonl');
+  // A dir with no .jsonl → null.
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'sa-empty-'));
+  assert.strictEqual(findNewestSession(empty), null);
+});
+
+test('renderReport metadata header shows slug/session/range/counts/models/cwd/branch (TGT-04)', () => {
+  const meta = {
+    sessionId: 's1', cwd: 'D:\\workspace\\调用分析skill', gitBranch: 'master',
+    firstTs: '2026-06-17T10:00:00Z', lastTs: '2026-06-17T10:05:00Z', models: ['glm-5.2'],
+  };
+  const messages = [
+    { role: 'user', uuid: 'u1', timestamp: '2026-06-17T10:00:00Z', model: undefined, content: 'hi' },
+    { role: 'assistant', uuid: 'a1', timestamp: '2026-06-17T10:00:01Z', model: 'glm-5.2', content: [{ type: 'tool_use', id: 't1', name: 'Read', input: {} }] },
+    { role: 'user', uuid: 'u2', timestamp: '2026-06-17T10:00:02Z', model: undefined, content: [{ type: 'tool_result', tool_use_id: 't1', text: 'ok', is_error: false }] },
+  ];
+  const md = renderReport({ meta, messages });
+  assert.ok(md.includes('s1'), 'session id present');
+  assert.ok(md.includes('D--workspace-----skill'), 'project slug (derived from cwd) present');
+  assert.ok(md.includes('master'), 'git branch present');
+  assert.ok(md.includes('glm-5.2'), 'model present');
+  assert.ok(md.includes('3 messages'), 'message count present');
+  assert.ok(md.includes('1 tool call'), 'tool count present');
+});
+
+test('user text-only content arrays render text under the header; empty arrays emit no orphan header (D-14)', () => {
+  const messages = [
+    { role: 'user', uuid: 'u1', timestamp: 't1', model: undefined, content: [{ type: 'text', text: 'a note' }] },
+    { role: 'user', uuid: 'u2', timestamp: 't2', model: undefined, content: [] },
+  ];
+  const md = renderReport({ meta: null, messages });
+  // Text-only user array: text rendered under a 👤 header (no empty header).
+  assert.ok(md.includes('### 👤 User — t1'), 'text-only user array gets a header');
+  assert.ok(md.includes('a note'), 'user text block rendered under the header');
+  // Empty user array: no orphan header at all.
+  assert.ok(!md.includes('### 👤 User — t2'), 'empty user array emits no orphan header');
+});

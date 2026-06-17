@@ -9,6 +9,7 @@ Shouffin 的个人 Agent Skill 仓库，兼容 [Agent Skills](https://agentskill
 | `docx-shouffin` | 读取和创建 Word 文档（.docx），支持 Markdown 互转 |
 | `excel-shouffin` | 读取和创建 Excel 文件（.xlsx/.xlsm），支持 Markdown/JSON 格式互转 |
 | `skill-forge-shouffin` | Skill 脚手架生成器，快速创建新的 Agent Skill |
+| `session-analysis-shouffin` | 解析本地 Claude Code 会话记录（.jsonl），生成可读 Markdown 报告（对话回放 + 工具调用明细） |
 
 ## 安装
 
