@@ -143,8 +143,15 @@ function parseSession(filePath) {
     if (role === 'user') {
       if (Array.isArray(msg.content)) {
         source = msg.content.some((b) => b && b.type === 'tool_result') ? 'tool_result' : 'human';
+      } else if (obj.promptSource === 'typed') {
+        source = 'human';
+      } else if (typeof msg.content === 'string' && /<command-(name|message)>/.test(msg.content)) {
+        // A slash command the user invoked (e.g. /darwin-skill) — recorded as a
+        // <command-name> expansion, not "typed". Distinct from caveat/stdout/task
+        // injections, so it gets its own 💻 icon in the report.
+        source = 'command';
       } else {
-        source = obj.promptSource === 'typed' ? 'human' : 'system';
+        source = 'system';
       }
     }
 
@@ -295,7 +302,7 @@ function truncateLines(text, max) {
 // transcripts predating the label). "human"=real input, "system"=injected,
 // "tool_result"=tool output array.
 function userSource(msg) {
-  if (msg.source === 'human' || msg.source === 'system' || msg.source === 'tool_result') {
+  if (msg.source === 'human' || msg.source === 'system' || msg.source === 'tool_result' || msg.source === 'command') {
     return msg.source;
   }
   if (Array.isArray(msg.content)) {
@@ -340,6 +347,17 @@ function messagePreview(msg, max = 36) {
   }
   const s = String(text).replace(/\s+/g, ' ').trim();
   if (!s) return '';
+  return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
+// Preview a slash-command user message: extract `/command-name` (+ args) so the
+// 💻 H3 heading reads as the command the user invoked (e.g. `/darwin-skill`).
+function commandPreview(msg, max = 36) {
+  const c = typeof msg.content === 'string' ? msg.content : '';
+  const name = (c.match(/<command-name>([^<]+)<\/command-name>/) || [])[1] || '';
+  const args = (c.match(/<command-args>([^<]*)<\/command-args>/) || [])[1] || '';
+  if (!name) return '';
+  const s = (name + (args ? ' ' + args : '')).replace(/\s+/g, ' ').trim();
   return s.length > max ? s.slice(0, max) + '…' : s;
 }
 
@@ -416,6 +434,12 @@ function renderConversation(messages) {
       firstTurnSeen = true;
       const prev = messagePreview(msg);
       parts.push(`### 👤 ${prev || 'User'} — ${ts}`);
+    } else if (msg.role === 'user' && userSource(msg) === 'command') {
+      // A slash command is also a user-initiated turn → H3, but with 💻 so it's
+      // visually distinct from a typed prompt.
+      if (firstTurnSeen) parts.push('', '---', '');
+      firstTurnSeen = true;
+      parts.push(`### 💻 ${commandPreview(msg) || 'Command'} — ${ts}`);
     } else if (msg.role === 'user' && userSource(msg) === 'system') {
       parts.push(`#### ⚙️ System — ${ts}`);
     } else if (msg.role === 'user') {
