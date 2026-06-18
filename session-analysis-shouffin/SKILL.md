@@ -16,16 +16,13 @@ without leaving Claude Code and without any GUI.
 - "Make a readable summary/report of this session."
 - Review or audit tool usage for a past session.
 
-## How to run
+## How to invoke
 
-Run the parser with **Node** (the only runtime required — no `npm install`):
+### Quick start — `/session-analysis-shouffin`
 
-```
-node analyze-session.js
-```
-
-That's it. With **no arguments**, it analyzes the **current project's most
-recent session**:
+Type `/session-analysis-shouffin` in chat to analyze the **current project's
+most recent session** and save the report to `./session-analysis/`. No arguments
+needed — the skill auto-detects everything:
 
 1. Derives the transcript dir from the current working directory by encoding the
    path to the `~/.claude/projects/<slug>` form (every non-`[A-Za-z0-9]` char →
@@ -33,13 +30,18 @@ recent session**:
 2. Selects the newest-by-mtime `.jsonl` in that dir.
 3. Parses it and writes the report.
 
-### Explicit path override
-
-To analyze a specific session instead of the auto-selected one, pass its path:
+### Manual invocation (same behavior)
 
 ```
-node analyze-session.js ~/.claude/projects/<slug>/<session-id>.jsonl
+node analyze-session.js
 ```
+
+### Analyze a different session
+
+To analyze a session other than the most recent one, the model should read the
+target `.jsonl` from `~/.claude/projects/` and decide whether further processing
+is needed based on the conversation context, rather than passing a path
+argument.
 
 ## Output
 
