@@ -10,6 +10,7 @@ const {
   collectToolCalls,
   renderReport,
   truncateLines,
+  stripAnsi,
   verifyFidelity,
   MAX_OUTPUT_LINES,
   MAX_INPUT_LINES,
@@ -375,4 +376,48 @@ test('user text-only content arrays render text under the header; empty arrays e
   assert.ok(md.includes('a note'), 'user text block rendered under the header');
   // Empty user array: no orphan header at all.
   assert.ok(!md.includes('### 👤 User — t2'), 'empty user array emits no orphan header');
+});
+
+test('stripAnsi strips ANSI/VT color codes (PowerShell output) from tool_result text', () => {
+  // Direct unit check on stripAnsi: SGR green-bold + reset sequences removed.
+  const pwsh = '\x1b[32;1mMode \x1b[0m\x1b[32;1m Name\x1b[0m\nd---- new-dev';
+  assert.strictEqual(stripAnsi(pwsh), 'Mode  Name\nd---- new-dev');
+  // Non-string passthrough (no crash on undefined/null).
+  assert.strictEqual(stripAnsi(undefined), undefined);
+  assert.strictEqual(stripAnsi(null), null);
+
+  // End-to-end: a tool_result carrying PowerShell-colored output flows through
+  // parseSession → resultText (stripAnsi) → renderReport with ANSI gone.
+  const fixture = writeFixture([
+    {
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id: 'tu_a', name: 'Bash', input: { command: 'ls' } }],
+        model: 'claude-test-model',
+      },
+      uuid: 'a1', parentUuid: null, timestamp: '2026-06-18T10:00:01Z',
+      sessionId: 'sess-ansi', cwd: 'D:\\proj', gitBranch: 'master', version: '1.0',
+    },
+    {
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [
+          { type: 'tool_result', tool_use_id: 'tu_a', content: [{ type: 'text', text: '---PARENT---\n\n\x1b[32;1mMode \x1b[0m\x1b[32;1m Name\x1b[0m\nd---- new-dev' }], is_error: false },
+        ],
+      },
+      uuid: 'u1', parentUuid: 'a1', timestamp: '2026-06-18T10:00:02Z',
+      sessionId: 'sess-ansi', cwd: 'D:\\proj', gitBranch: 'master', version: '1.0',
+    },
+  ]);
+
+  const { messages } = parseSession(fixture);
+  const tr = messages[1].content[0];
+  assert.strictEqual(tr.text, '---PARENT---\n\nMode  Name\nd---- new-dev', 'ANSI stripped from tool_result text');
+
+  const md = renderReport({ meta: null, messages });
+  assert.ok(!md.includes('\x1b['), 'no ESC sequence survives into the report');
+  assert.ok(!md.includes('[32;1m'), 'no visible ANSI marker leaked');
+  assert.ok(md.includes('Mode  Name'), 'clean text present after stripping');
 });

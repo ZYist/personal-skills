@@ -19,18 +19,31 @@ const PARSE_SKIP_TYPES = new Set([
   'file-history-snapshot',
 ]);
 
-// Flatten a tool_result's `content` field into a single text string.
-// `content` may be a plain string OR an array of {type:"text",text} blocks;
-// join the text blocks with "\n". Missing/empty content → "".
+// Strip ANSI/VT escape sequences (e.g. PowerShell 7 color codes like
+// "\x1b[32;1m") so they don't leak into the Markdown report as visible
+// "[32;1m"-style noise. Covers CSI sequences: SGR colors, cursor moves, etc.
+const ANSI_RE = /\x1b\[[0-9;?]*[A-Za-z]/g;
+function stripAnsi(s) {
+  return typeof s === 'string' ? s.replace(ANSI_RE, '') : s;
+}
+
+// Flatten a tool_result's `content` field into a single text string, with ANSI
+// escape codes stripped. `content` may be a plain string OR an array of
+// {type:"text",text} blocks; join the text blocks with "\n". Missing/empty
+// content → "".
 function resultText(content) {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
+  let text;
+  if (typeof content === 'string') {
+    text = content;
+  } else if (Array.isArray(content)) {
+    text = content
       .filter((p) => p && p.type === 'text' && typeof p.text === 'string')
       .map((p) => p.text)
       .join('\n');
+  } else {
+    text = '';
   }
-  return '';
+  return stripAnsi(text);
 }
 
 // Normalize one user tool_result block to the contract shape
@@ -453,6 +466,7 @@ module.exports = {
   verifyFidelity,
   renderReport,
   truncateLines,
+  stripAnsi,
   MAX_OUTPUT_LINES,
   MAX_INPUT_LINES,
   MAX_THINKING_LINES,
