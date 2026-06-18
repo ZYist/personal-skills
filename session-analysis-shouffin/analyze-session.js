@@ -132,12 +132,29 @@ function parseSession(filePath) {
       content = msg.content;
     }
 
+    // Source label for user messages, driving the report's role icons:
+    //   "human"       — real keyboard input (promptSource === "typed")
+    //   "system"      — injected (slash command, caveat, local-command,
+    //                   task-notification, etc.)
+    //   "tool_result" — a tool result array
+    // Assistant messages carry no source. GSD/tiger-flow "代替用户输入" is the
+    // slash-command expansion, which lands here as "system".
+    let source;
+    if (role === 'user') {
+      if (Array.isArray(msg.content)) {
+        source = msg.content.some((b) => b && b.type === 'tool_result') ? 'tool_result' : 'human';
+      } else {
+        source = obj.promptSource === 'typed' ? 'human' : 'system';
+      }
+    }
+
     messages.push({
       role,
       uuid: obj.uuid,
       timestamp: obj.timestamp,
       model,
       content,
+      source,
     });
   }
 
@@ -273,13 +290,30 @@ function truncateLines(text, max) {
   return lines.slice(0, max).join('\n') + '\n+' + (lines.length - max) + ' more lines';
 }
 
+// Resolve a user message's source label, falling back to a content-based
+// inference when the field is absent (e.g. messages built directly in tests, or
+// transcripts predating the label). "human"=real input, "system"=injected,
+// "tool_result"=tool output array.
+function userSource(msg) {
+  if (msg.source === 'human' || msg.source === 'system' || msg.source === 'tool_result') {
+    return msg.source;
+  }
+  if (Array.isArray(msg.content)) {
+    return msg.content.some((b) => b && b.type === 'tool_result') ? 'tool_result' : 'human';
+  }
+  return 'human';
+}
+
 // Conversation replay: walks messages in order, emitting a role header with the
 // timestamp (CONVO-03) then the content — user prompts, assistant text/tool_use/
 // thinking, and interleaved tool_results (CONVO-01). Thinking blocks collapse
 // into default-folded <details> (CONVO-02). A message whose array emits no body
-// (e.g. an empty user array) produces NO orphan header (D-14).
+// (e.g. an empty user array) produces NO orphan header (D-14). User messages use
+// distinct icons by source (CONVO-04): 👤 human, ⚙️ system, 🔧 tool_result; a
+// "---" separator precedes every fresh user INPUT (human/system) after the first.
 function renderConversation(messages) {
   const parts = [];
+  let firstTurnSeen = false;
   for (const msg of messages) {
     const ts = msg.timestamp || '';
     const content = msg.content;
@@ -321,8 +355,22 @@ function renderConversation(messages) {
     // D-14: skip the whole message (header included) when nothing was emitted.
     if (body.length === 0) continue;
 
+    // CONVO-04: a "---" separator before every fresh user INPUT (human or
+    // system) after the first turn. tool_result is part of the current turn,
+    // so it never starts a new one.
     if (msg.role === 'user') {
-      parts.push(`### 👤 User — ${ts}`);
+      const src = userSource(msg);
+      if (src === 'human' || src === 'system') {
+        if (firstTurnSeen) parts.push('', '---', '');
+        firstTurnSeen = true;
+      }
+    }
+
+    if (msg.role === 'user') {
+      const src = userSource(msg);
+      if (src === 'tool_result') parts.push(`### 🔧 Tool Result — ${ts}`);
+      else if (src === 'system') parts.push(`### ⚙️ System — ${ts}`);
+      else parts.push(`### 👤 User — ${ts}`);
     } else {
       parts.push(`### 🤖 Assistant — ${ts}${msg.model ? ` (${msg.model})` : ''}`);
     }

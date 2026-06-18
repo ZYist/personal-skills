@@ -421,3 +421,47 @@ test('stripAnsi strips ANSI/VT color codes (PowerShell output) from tool_result 
   assert.ok(!md.includes('[32;1m'), 'no visible ANSI marker leaked');
   assert.ok(md.includes('Mode  Name'), 'clean text present after stripping');
 });
+
+test('parseSession labels user messages by source: human / system / tool_result (CONVO-04)', () => {
+  const fixture = writeFixture([
+    { type: 'user', message: { role: 'user', content: 'hi' }, promptSource: 'typed', uuid: 'u1', parentUuid: null, timestamp: 't1', sessionId: 's', cwd: 'D:\\p', gitBranch: 'm', version: '1' },
+    { type: 'user', message: { role: 'user', content: '<command-name>/clear</command-name>' }, uuid: 'u2', parentUuid: 'u1', timestamp: 't2', sessionId: 's', cwd: 'D:\\p', gitBranch: 'm', version: '1' },
+    { type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'tu_1', name: 'Bash', input: {} }], model: 'm' }, uuid: 'a1', parentUuid: 'u2', timestamp: 't3', sessionId: 's', cwd: 'D:\\p', gitBranch: 'm', version: '1' },
+    { type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tu_1', content: 'ok', is_error: false }] }, uuid: 'u3', parentUuid: 'a1', timestamp: 't4', sessionId: 's', cwd: 'D:\\p', gitBranch: 'm', version: '1' },
+  ]);
+  const { messages } = parseSession(fixture);
+  assert.strictEqual(messages[0].source, 'human', 'typed string → human');
+  assert.strictEqual(messages[1].source, 'system', 'non-typed string (slash command) → system');
+  assert.strictEqual(messages[2].source, undefined, 'assistant carries no source');
+  assert.strictEqual(messages[3].source, 'tool_result', 'tool_result array → tool_result');
+});
+
+test('renderConversation renders 👤/⚙️/🔧 by source and inserts --- between turns (CONVO-04)', () => {
+  const messages = [
+    { role: 'user', uuid: 'u1', timestamp: 't1', model: undefined, source: 'human', content: '帮我看看' },
+    { role: 'assistant', uuid: 'a1', timestamp: 't2', model: 'm', content: [{ type: 'text', text: '好的' }] },
+    { role: 'user', uuid: 'u2', timestamp: 't3', model: undefined, source: 'tool_result', content: [{ type: 'tool_result', tool_use_id: 'c1', text: 'out', is_error: false }] },
+    { role: 'user', uuid: 'u3', timestamp: 't4', model: undefined, source: 'system', content: '<command-name>/gsd-map-codebase</command-name>' },
+    { role: 'assistant', uuid: 'a2', timestamp: 't5', model: 'm', content: [{ type: 'text', text: '开始映射' }] },
+    { role: 'user', uuid: 'u4', timestamp: 't6', model: undefined, source: 'human', content: '继续' },
+  ];
+  const md = renderReport({ meta: null, messages });
+
+  // Icons by source.
+  assert.ok(md.includes('### 👤 User — t1'), 'human → 👤 User');
+  assert.ok(md.includes('### 🔧 Tool Result — t3'), 'tool_result → 🔧 Tool Result');
+  assert.ok(md.includes('### ⚙️ System — t4'), 'system → ⚙️ System');
+  assert.ok(md.includes('### 👤 User — t6'), 'second human → 👤 User');
+
+  // --- separator placement: before fresh inputs (human/system) after the first,
+  // NEVER before a tool_result (it belongs to the current turn).
+  const idxT1 = md.indexOf('### 👤 User — t1');
+  const idxT2 = md.indexOf('### 🤖 Assistant — t2');
+  const idxT3 = md.indexOf('### 🔧 Tool Result — t3');
+  const idxT4 = md.indexOf('### ⚙️ System — t4');
+  const idxT6 = md.indexOf('### 👤 User — t6');
+  assert.ok(!md.slice(0, idxT1).includes('---'), 'no separator before the first turn');
+  assert.ok(!md.slice(idxT2, idxT3).includes('---'), 'no separator before a tool_result (same turn)');
+  assert.ok(md.slice(idxT1, idxT4).includes('---'), 'separator before the system turn (new turn)');
+  assert.ok(md.slice(idxT4, idxT6).includes('---'), 'separator before the second human turn');
+});
