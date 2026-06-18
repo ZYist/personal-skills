@@ -205,7 +205,7 @@ test('renderReport: conversation replay + tool summary + truncated detail + ✗ 
   assert.ok(idxSummary < idxDetail, 'summary before detail');
 
   // Conversation: role headers with timestamps, prompt, assistant text, thinking blockquote, interleaved result.
-  assert.ok(md.includes('👤 User — 2026-06-17T10:00:00Z'), 'user header with ts');
+  assert.ok(md.includes('👤 hello — 2026-06-17T10:00:00Z'), 'human header with ts + content preview');
   assert.ok(md.includes('🤖 Assistant — 2026-06-17T10:00:01Z (claude-test-model)'), 'assistant header with ts + model');
   assert.ok(md.includes('hello'), 'user prompt present');
   assert.ok(md.includes('hi'), 'assistant text present');
@@ -371,11 +371,11 @@ test('user text-only content arrays render text under the header; empty arrays e
     { role: 'user', uuid: 'u2', timestamp: 't2', model: undefined, content: [] },
   ];
   const md = renderReport({ meta: null, messages });
-  // Text-only user array: text rendered under a 👤 header (no empty header).
-  assert.ok(md.includes('### 👤 User — t1'), 'text-only user array gets a header');
-  assert.ok(md.includes('a note'), 'user text block rendered under the header');
-  // Empty user array: no orphan header at all.
-  assert.ok(!md.includes('### 👤 User — t2'), 'empty user array emits no orphan header');
+  // Text-only user array: H3 titled by the text preview; content quoted below.
+  assert.ok(md.includes('### 👤 a note — t1'), 'text-only user array → H3 titled by preview');
+  assert.ok(md.includes('a note'), 'user text block quoted under the header');
+  // Empty user array: no orphan header at all (t2 never appears).
+  assert.ok(!md.includes('t2'), 'empty user array emits no orphan header');
 });
 
 test('stripAnsi strips ANSI/VT color codes (PowerShell output) from tool_result text', () => {
@@ -436,34 +436,32 @@ test('parseSession labels user messages by source: human / system / tool_result 
   assert.strictEqual(messages[3].source, 'tool_result', 'tool_result array → tool_result');
 });
 
-test('renderConversation renders 👤/⚙️/🔧 by source and inserts --- between turns (CONVO-04)', () => {
+test('renderConversation: human→H3 with preview, others→H4, --- only before human turns (CONVO-04/05)', () => {
   const messages = [
-    { role: 'user', uuid: 'u1', timestamp: 't1', model: undefined, source: 'human', content: '帮我看看' },
+    { role: 'user', uuid: 'u1', timestamp: 't1', model: undefined, source: 'human', content: '帮我看看目录' },
     { role: 'assistant', uuid: 'a1', timestamp: 't2', model: 'm', content: [{ type: 'text', text: '好的' }] },
     { role: 'user', uuid: 'u2', timestamp: 't3', model: undefined, source: 'tool_result', content: [{ type: 'tool_result', tool_use_id: 'c1', text: 'out', is_error: false }] },
     { role: 'user', uuid: 'u3', timestamp: 't4', model: undefined, source: 'system', content: '<command-name>/gsd-map-codebase</command-name>' },
     { role: 'assistant', uuid: 'a2', timestamp: 't5', model: 'm', content: [{ type: 'text', text: '开始映射' }] },
-    { role: 'user', uuid: 'u4', timestamp: 't6', model: undefined, source: 'human', content: '继续' },
+    { role: 'user', uuid: 'u4', timestamp: 't6', model: undefined, source: 'human', content: '继续下一步' },
   ];
   const md = renderReport({ meta: null, messages });
 
-  // Icons by source.
-  assert.ok(md.includes('### 👤 User — t1'), 'human → 👤 User');
-  assert.ok(md.includes('### 🔧 Tool Result — t3'), 'tool_result → 🔧 Tool Result');
-  assert.ok(md.includes('### ⚙️ System — t4'), 'system → ⚙️ System');
-  assert.ok(md.includes('### 👤 User — t6'), 'second human → 👤 User');
+  // H3 for human turns (titled by a content preview); H4 for everything else.
+  assert.ok(md.includes('### 👤 帮我看看目录 — t1'), 'human → H3 titled by preview');
+  assert.ok(md.includes('#### 🤖 Assistant — t2 (m)'), 'assistant → H4');
+  assert.ok(md.includes('#### 🔧 Tool Result — t3'), 'tool_result → H4');
+  assert.ok(md.includes('#### ⚙️ System — t4'), 'system → H4');
+  assert.ok(md.includes('### 👤 继续下一步 — t6'), 'second human → H3 titled by preview');
 
-  // --- separator placement: before fresh inputs (human/system) after the first,
-  // NEVER before a tool_result (it belongs to the current turn).
-  const idxT1 = md.indexOf('### 👤 User — t1');
-  const idxT2 = md.indexOf('### 🤖 Assistant — t2');
-  const idxT3 = md.indexOf('### 🔧 Tool Result — t3');
-  const idxT4 = md.indexOf('### ⚙️ System — t4');
-  const idxT6 = md.indexOf('### 👤 User — t6');
+  // --- only before a fresh HUMAN turn (t6), never before tool_result/system/
+  // assistant (they belong to the current turn).
+  const idxT1 = md.indexOf('### 👤 帮我看看目录 — t1');
+  const idxT4 = md.indexOf('#### ⚙️ System — t4');
+  const idxT6 = md.indexOf('### 👤 继续下一步 — t6');
   assert.ok(!md.slice(0, idxT1).includes('---'), 'no separator before the first turn');
-  assert.ok(!md.slice(idxT2, idxT3).includes('---'), 'no separator before a tool_result (same turn)');
-  assert.ok(md.slice(idxT1, idxT4).includes('---'), 'separator before the system turn (new turn)');
-  assert.ok(md.slice(idxT4, idxT6).includes('---'), 'separator before the second human turn');
+  assert.ok(!md.slice(idxT1, idxT4).includes('---'), 'no separator within a turn (before assistant/tool_result/system)');
+  assert.ok(md.slice(idxT4, idxT6).includes('---'), 'separator before the next human turn');
 });
 
 test('stripAnsi covers ALL text fields, not just tool_result (user string, assistant text, thinking, input)', () => {
@@ -480,4 +478,58 @@ test('stripAnsi covers ALL text fields, not just tool_result (user string, assis
   assert.ok(md.includes('Set model to glm-5.2'), 'user string ANSI stripped, clean text remains');
   assert.ok(md.includes('done ok'), 'assistant text ANSI stripped');
   assert.ok(md.includes('ponder blue'), 'thinking ANSI stripped');
+});
+
+test('escapeHeadings neutralizes leading # in content so it never pollutes the outline (CONVO-05)', () => {
+  // An assistant reply that uses ## as a sub-heading, plus a user prompt that
+  // pastes a markdown doc. The assistant's ## must NOT become an outline node.
+  const messages = [
+    { role: 'user', uuid: 'u1', timestamp: 't1', model: undefined, source: 'human', content: '帮我写个报告，标题用 ## 大标题' },
+    { role: 'assistant', uuid: 'a1', timestamp: 't2', model: 'm', content: [
+      { type: 'text', text: '好的。\n## 第一步：收集\n内容\n### 子节\n更多内容' },
+    ] },
+  ];
+  const md = renderReport({ meta: null, messages });
+  // The report's own structural heading is intact.
+  assert.ok(/^## Conversation$/m.test(md), 'structural ## Conversation still a heading');
+  // Assistant content ## is escaped (backslash-prefixed), not parsed as a heading.
+  assert.ok(!/^## 第一步：收集$/m.test(md), 'assistant "## 第一步" is NOT a heading');
+  assert.ok(!/^### 子节$/m.test(md), 'assistant "### 子节" is NOT a heading');
+  assert.ok(md.includes('\\## 第一步：收集'), 'assistant ## escaped to \\##');
+  assert.ok(md.includes('\\### 子节'), 'assistant ### escaped to \\###');
+});
+
+test('fenceFor grows the code fence when content contains ``` so it never leaks (CONVO-05)', () => {
+  // A tool result whose body itself contains a ``` block must NOT close the
+  // outer fence early and leak its headings into the outline.
+  const messages = [
+    { role: 'user', uuid: 'u1', timestamp: 't1', model: undefined, source: 'human', content: 'run it' },
+    { role: 'assistant', uuid: 'a1', timestamp: 't2', model: 'm', content: [{ type: 'tool_use', id: 'c1', name: 'Bash', input: {} }] },
+    { role: 'user', uuid: 'u2', timestamp: 't3', model: undefined, source: 'tool_result', content: [{ type: 'tool_result', tool_use_id: 'c1', text: '## LEAKED HEADING\n```\ncode block\n```\nafter', is_error: false }] },
+  ];
+  const md = renderReport({ meta: null, messages });
+  assert.ok(/`{4,}/.test(md), 'outer fence grew past ``` because the content contains ```');
+  assert.ok(md.includes('## LEAKED HEADING'), 'leaked content still present (now safely fenced)');
+  // Fences are balanced: walking lines, code-state returns to false (no leak).
+  let inCode = false;
+  for (const l of md.split('\n')) if (/^`{3,}/.test(l)) inCode = !inCode;
+  assert.strictEqual(inCode, false, 'fences balanced — no ``` leaks into the outline');
+});
+
+test('thinking containing ``` is fenced inside its <details> so it never breaks the outline (CONVO-05)', () => {
+  // Regression: a thinking block that muses about code (with ```) used to leak
+  // and swallow subsequent headings. Now the thinking body is code-fenced.
+  const messages = [
+    { role: 'user', uuid: 'u1', timestamp: 't1', model: undefined, source: 'human', content: 'go' },
+    { role: 'assistant', uuid: 'a1', timestamp: 't2', model: 'm', content: [
+      { type: 'thinking', thinking: 'let me consider\n```\nsome code\n```\n## not a real heading' },
+      { type: 'text', text: 'done' },
+    ] },
+    { role: 'user', uuid: 'u2', timestamp: 't3', model: undefined, source: 'human', content: 'next turn' },
+  ];
+  const md = renderReport({ meta: null, messages });
+  assert.ok(md.includes('### 👤 next turn'), 'the next turn heading is NOT swallowed by leaked ```');
+  let inCode = false;
+  for (const l of md.split('\n')) if (/^`{3,}/.test(l)) inCode = !inCode;
+  assert.strictEqual(inCode, false, 'fences balanced across the thinking block');
 });

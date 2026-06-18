@@ -304,6 +304,45 @@ function userSource(msg) {
   return 'human';
 }
 
+// Escape leading markdown ATX headings (#{1,6} at line start) so content text
+// never hijacks the report's outline (Obsidian / MD outline nav). Only
+// line-start `#` is touched; inline `#` and all other markdown (lists, bold,
+// code) render as-is.
+const HEADING_RE = /^(#{1,6})(\s)/gm;
+function escapeHeadings(s) {
+  return typeof s === 'string' ? s.replace(HEADING_RE, '\\$1$2') : s;
+}
+
+// Pick a code-fence long enough to enclose `text`: one more backtick than the
+// longest backtick run inside it (min 3). Without this, a tool result that
+// itself contains ``` would close the outer fence early and leak its markdown
+// (headings included) into the report outline.
+function fenceFor(text) {
+  const str = String(text == null ? '' : text);
+  let maxRun = 0;
+  let run = 0;
+  for (const ch of str) {
+    if (ch === '`') { run += 1; if (run > maxRun) maxRun = run; }
+    else run = 0;
+  }
+  return '`'.repeat(Math.max(3, maxRun + 1));
+}
+
+// One-line preview of a message's text, for the human-input H3 heading so the
+// outline reads as "what the user asked", not a sea of timestamps. Collapses
+// whitespace and truncates with an ellipsis.
+function messagePreview(msg, max = 36) {
+  let text = '';
+  if (typeof msg.content === 'string') text = msg.content;
+  else if (Array.isArray(msg.content)) {
+    const t = msg.content.find((b) => b && b.type === 'text');
+    text = t ? t.text : '';
+  }
+  const s = String(text).replace(/\s+/g, ' ').trim();
+  if (!s) return '';
+  return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
 // Conversation replay: walks messages in order, emitting a role header with the
 // timestamp (CONVO-03) then the content — user prompts, assistant text/tool_use/
 // thinking, and interleaved tool_results (CONVO-01). Thinking blocks collapse
@@ -319,36 +358,48 @@ function renderConversation(messages) {
     const content = msg.content;
 
     // Collect this message's body lines first so D-14 can drop a message whose
-    // array emits nothing (no orphan `### 👤 User` header with no body).
+    // array emits nothing (no orphan header). Body rules (CONVO-05):
+    //   - user STRING content (human prompt / system inject) → code-block quote
+    //     so its markdown never renders or pollutes the outline.
+    //   - assistant text → keep markdown, but escape leading `#` headings.
+    //   - tool_use input / tool_result output → code blocks (already inert).
+    //   - thinking → folded <details>, leading `#` escaped.
     const body = [];
     if (typeof content === 'string') {
-      body.push('', stripAnsi(content), '');
+      const txt = stripAnsi(content);
+      const f = fenceFor(txt);
+      body.push('', f, txt, f, '');
     } else if (Array.isArray(content)) {
       for (const block of content) {
         if (!block || typeof block !== 'object') continue;
         if (msg.role === 'assistant') {
           if (block.type === 'text') {
-            body.push('', stripAnsi(block.text || ''), '');
+            body.push('', escapeHeadings(stripAnsi(block.text || '')), '');
           } else if (block.type === 'tool_use') {
             const inputStr = truncateLines(stripAnsi(JSON.stringify(block.input)), MAX_INPUT_LINES);
-            body.push('', '```', `Tool: ${block.name} (${block.id})`, inputStr, '```', '');
+            const f = fenceFor(inputStr);
+            body.push('', f, `Tool: ${block.name} (${block.id})`, inputStr, f, '');
           } else if (block.type === 'thinking') {
             // CONVO-02 (D-01..04): collapse each thinking block into a
             // default-folded <details>, truncated via MAX_THINKING_LINES. One
-            // <details> per block — this loop already iterates blocks, so
-            // multiple thinking blocks in one message stay independent (D-04).
-            body.push('', '<details><summary>💭 thinking</summary>', '',
-              truncateLines(stripAnsi(block.thinking || ''), MAX_THINKING_LINES), '', '</details>', '');
+            // <details> per block. The body is wrapped in a code fence (sized
+            // via fenceFor) so a ``` inside the thinking can't leak and break
+            // the report's outline; inside a fence, `#` is inert too.
+            const th = truncateLines(stripAnsi(block.thinking || ''), MAX_THINKING_LINES);
+            const f = fenceFor(th);
+            body.push('', '<details><summary>💭 thinking</summary>', '', f, th, f, '', '</details>', '');
           }
         } else if (msg.role === 'user' && block.type === 'text') {
-          // D-14: a user array may carry text blocks (not just tool_results);
-          // render them under the header instead of an empty header.
-          body.push('', stripAnsi(block.text || ''), '');
+          // D-14: a user array may carry text blocks; quote them like a prompt.
+          const txt = stripAnsi(block.text || '');
+          const f = fenceFor(txt);
+          body.push('', f, txt, f, '');
         } else if (block.type === 'tool_result') {
           const mark = block.is_error ? ' ✗' : '';
           // block.text is already ANSI-stripped by resultText(); just truncate.
           const out = truncateLines(block.text || '', MAX_OUTPUT_LINES);
-          body.push('', '```', `Tool result (${block.tool_use_id})${mark}`, out, '```', '');
+          const f = fenceFor(out);
+          body.push('', f, `Tool result (${block.tool_use_id})${mark}`, out, f, '');
         }
       }
     }
@@ -356,24 +407,21 @@ function renderConversation(messages) {
     // D-14: skip the whole message (header included) when nothing was emitted.
     if (body.length === 0) continue;
 
-    // CONVO-04: a "---" separator before every fresh user INPUT (human or
-    // system) after the first turn. tool_result is part of the current turn,
-    // so it never starts a new one.
-    if (msg.role === 'user') {
-      const src = userSource(msg);
-      if (src === 'human' || src === 'system') {
-        if (firstTurnSeen) parts.push('', '---', '');
-        firstTurnSeen = true;
-      }
-    }
-
-    if (msg.role === 'user') {
-      const src = userSource(msg);
-      if (src === 'tool_result') parts.push(`### 🔧 Tool Result — ${ts}`);
-      else if (src === 'system') parts.push(`### ⚙️ System — ${ts}`);
-      else parts.push(`### 👤 User — ${ts}`);
+    // CONVO-05 outline hierarchy: a real user INPUT (human) opens a top-level
+    // turn (H3, titled with a preview of what was asked) so the Obsidian outline
+    // navigates by user turn. Everything within the turn — assistant replies,
+    // tool results, system injections — drops to H4. A "---" separates turns.
+    if (msg.role === 'user' && userSource(msg) === 'human') {
+      if (firstTurnSeen) parts.push('', '---', '');
+      firstTurnSeen = true;
+      const prev = messagePreview(msg);
+      parts.push(`### 👤 ${prev || 'User'} — ${ts}`);
+    } else if (msg.role === 'user' && userSource(msg) === 'system') {
+      parts.push(`#### ⚙️ System — ${ts}`);
+    } else if (msg.role === 'user') {
+      parts.push(`#### 🔧 Tool Result — ${ts}`);
     } else {
-      parts.push(`### 🤖 Assistant — ${ts}${msg.model ? ` (${msg.model})` : ''}`);
+      parts.push(`#### 🤖 Assistant — ${ts}${msg.model ? ` (${msg.model})` : ''}`);
     }
     parts.push(...body);
   }
@@ -414,11 +462,14 @@ function renderToolDetail(calls) {
     parts.push(`### ${errored ? '✗ ' : ''}${toolUse.name} \`${toolUse.id}\``);
 
     const inputStr = truncateLines(stripAnsi(JSON.stringify(toolUse.input)), MAX_INPUT_LINES);
-    parts.push('', '**Input:**', '```json', inputStr, '```', '');
+    const fIn = fenceFor(inputStr);
+    parts.push('', '**Input:**', fIn + 'json', inputStr, fIn, '');
 
     if (toolResult) {
       parts.push(`**Result:**${errored ? ' ✗' : ''}`);
-      parts.push('```', truncateLines(toolResult.text || '', MAX_OUTPUT_LINES), '```', '');
+      const out = truncateLines(toolResult.text || '', MAX_OUTPUT_LINES);
+      const fOut = fenceFor(out);
+      parts.push(fOut, out, fOut, '');
     } else {
       parts.push('**Result:** _(no result in transcript)_', '');
     }

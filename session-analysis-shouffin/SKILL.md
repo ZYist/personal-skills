@@ -47,14 +47,19 @@ argument.
 
 - A Markdown report written to **`./session-analysis/<YYYY-MM-DD>_<short-id>.md`**
   (relative to the cwd), containing:
-  - **Conversation** — chronological replay with role icons + timestamps. User
-    messages are split by source so real input stands out from workflow noise:
-    👤 **User** = real keyboard input (`promptSource: "typed"`), ⚙️ **System** =
-    injected (slash commands like `/gsd-*`, `<local-command-caveat>`,
-    local-command output, task notifications — this is where GSD/tiger-flow
-    "代替用户输入" lands), 🔧 **Tool Result** = tool output; 🤖 **Assistant**
-    carries text / tool_use / thinking. A `---` separator precedes each new
-    user-input turn for readability.
+  - **Conversation** — chronological replay, structured for outline navigation
+    (Obsidian / MD pane). Each real user input opens an **H3 turn** titled by a
+    preview of what was asked; everything within the turn — assistant replies,
+    tool results, system injections — drops to **H4**, so the outline navigates
+    by user turn. Source icons: 👤 **User** = real keyboard input
+    (`promptSource: "typed"`); ⚙️ **System** = injected (slash commands like
+    `/gsd-*`, `<local-command-caveat>`, local-command output, task notifications
+    — this is where GSD/tiger-flow "代替用户输入" lands); 🔧 **Tool Result** =
+    tool output; 🤖 **Assistant** = text / tool_use / thinking. A `---`
+    separator marks each new user turn. User inputs are code-quoted; assistant
+    text keeps its markdown but leading `#` is escaped so it never hijacks the
+    outline; code fences auto-grow so a ``` inside any result can't break the
+    structure.
   - **Tool Call Summary** — per-tool counts of total / successes / failures.
   - **Tool Call Detail** — every `tool_use` with its full input and result
     (outputs truncated ~50 lines, inputs ~200 lines, with a `+N more lines`
