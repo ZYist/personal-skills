@@ -20,7 +20,7 @@ Shouffin 的个人 Agent Skill 仓库，兼容 [Agent Skills](https://agentskill
 npx skills add ZYist/personal-skills --list
 
 # 安装单个 skill
-npx skills add ZYist/personal-skills <skill-name>
+npx skills add ZYist/personal-skills --skill <skill-name>
 
 # 安装全部 skill
 npx skills add ZYist/personal-skills
@@ -29,5 +29,5 @@ npx skills add ZYist/personal-skills
 例如：
 
 ```bash
-npx skills add ZYist/personal-skills docx-shouffin
+npx skills add ZYist/personal-skills --skill docx-shouffin
 ```

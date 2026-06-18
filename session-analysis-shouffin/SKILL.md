@@ -1,6 +1,6 @@
 ---
 name: session-analysis-shouffin
-description: Analyzes a local Claude Code session transcript (.jsonl) and writes a readable Markdown report — a chronological conversation replay plus full tool-call detail. Invoke when the user wants to review what happened in a session (what was said and which tools were called), summarize a past session, or audit tool usage. Zero-config: analyzes the current project's most recent session by default.
+description: "Analyzes a local Claude Code session transcript (.jsonl) and writes a readable Markdown report — a chronological conversation replay plus full tool-call detail. Invoke when the user wants to review what happened in a session (what was said and which tools were called), summarize a past session, or audit tool usage. Zero-config: analyzes the current project's most recent session by default."
 ---
 
 # Session Analyst
