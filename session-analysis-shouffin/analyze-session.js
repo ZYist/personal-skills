@@ -398,14 +398,15 @@ function renderConversation(messages) {
             const f = fenceFor(inputStr);
             body.push('', f, `Tool: ${block.name} (${block.id})`, inputStr, f, '');
           } else if (block.type === 'thinking') {
-            // CONVO-02 (D-01..04): collapse each thinking block into a
-            // default-folded <details>, truncated via MAX_THINKING_LINES. One
-            // <details> per block. The body is wrapped in a code fence (sized
-            // via fenceFor) so a ``` inside the thinking can't leak and break
-            // the report's outline; inside a fence, `#` is inert too.
+            // CONVO-02: collapse each thinking block into a default-folded
+            // Obsidian callout. We avoid <details> HTML because a closing tag
+            // landing near a code fence can make Obsidian swallow the content
+            // that follows (e.g. the Tool Call Summary table). The body is
+            // code-fenced (sized via fenceFor) so ``` / # stay inert.
             const th = truncateLines(stripAnsi(block.thinking || ''), MAX_THINKING_LINES);
             const f = fenceFor(th);
-            body.push('', '<details><summary>💭 thinking</summary>', '', f, th, f, '', '</details>', '');
+            const inner = [f, th, f].join('\n').split('\n').map((l) => (l.length ? '> ' : '>') + l).join('\n');
+            body.push('', '> [!note]- 💭 thinking', inner, '');
           }
         } else if (msg.role === 'user' && block.type === 'text') {
           // D-14: a user array may carry text blocks; quote them like a prompt.

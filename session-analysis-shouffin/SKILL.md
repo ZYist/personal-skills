@@ -115,5 +115,7 @@ breaks the run:
 
 - The parser, renderer, and CLI are all in the single file `analyze-session.js`
   alongside this `SKILL.md`.
-- Thinking blocks render inside a default-folded `<details>` to keep the
-  conversation replay uncluttered.
+- Thinking blocks render inside a default-folded Obsidian callout
+  (`> [!note]-`) to keep the conversation replay uncluttered. Callouts are used
+  instead of `<details>` HTML so a stray closing tag can never swallow later
+  content (e.g. the Tool Call Summary table).

@@ -209,7 +209,7 @@ test('renderReport: conversation replay + tool summary + truncated detail + ✗ 
   assert.ok(md.includes('🤖 Assistant — 2026-06-17T10:00:01Z (claude-test-model)'), 'assistant header with ts + model');
   assert.ok(md.includes('hello'), 'user prompt present');
   assert.ok(md.includes('hi'), 'assistant text present');
-  assert.ok(md.includes('<details><summary>💭 thinking</summary>'), 'thinking rendered as collapsed <details>');
+  assert.ok(md.includes('> [!note]- 💭 thinking'), 'thinking rendered as a collapsed callout');
   assert.ok(!md.includes('> **thinking:'), 'old blockquote shape removed');
   assert.ok(md.includes('Tool result'), 'tool result interleaved in conversation');
 
@@ -242,10 +242,10 @@ test('thinking blocks collapse into <details>, one per block, truncated at MAX_T
   ];
   const md = renderReport({ meta: null, messages });
 
-  const detailsCount = (md.match(/<details><summary>💭 thinking<\/summary>/g) || []).length;
-  assert.strictEqual(detailsCount, 2, 'two thinking blocks → two independent <details>');
+  const calloutCount = (md.match(/> \[!note\]- 💭 thinking/g) || []).length;
+  assert.strictEqual(calloutCount, 2, 'two thinking blocks → two independent callouts');
   assert.ok(md.includes('+5 more lines'), 'long (55-line) thinking truncated to 50 with +5 marker');
-  assert.ok(!md.includes('<details open'), 'details collapsed by default — no open attribute (D-02)');
+  assert.ok(!md.includes('<details'), 'no <details> HTML — uses Obsidian callout (no swallow risk)');
   assert.ok(!md.includes('> **thinking:'), 'old blockquote shape removed');
 });
 
