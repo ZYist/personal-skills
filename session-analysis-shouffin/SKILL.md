@@ -63,6 +63,43 @@ argument.
 - **Local-only:** reads only `~/.claude/projects/`. No network, no telemetry.
 - **Display only:** never executes or re-runs anything from the transcript.
 
+## Troubleshooting (failure modes)
+
+When the script exits non-zero or the report looks wrong, match the symptom
+below and follow the column chain — first-line fix, then the fallback if it
+still fails. The triggers mirror the script's real error paths.
+
+| Symptom / trigger | First-line fix | If still failing |
+|---|---|---|
+| `No transcript directory found for this project` (cwd's `~/.claude/projects/<slug>` does not exist) | Verify cwd — the slug is derived from cwd (above); running from the right project dir usually fixes it | That project has never had a session on this machine; ask the user for an existing `.jsonl` absolute path: `node analyze-session.js <path>` |
+| `No .jsonl sessions found` (dir exists but is empty) | That project's sessions were cleaned up; confirm with `ls ~/.claude/projects/<slug>/` | Use a different project's session, or ask the user for a `.jsonl` path |
+| The auto-selected session is not the one the user wanted | zero-config picks the newest by mtime — confirm the target with the user first | By convention **do not pass a path arg**: list candidate `.jsonl` files in the dir, have the user pick, then pass that absolute path |
+| Tool-call count is 0 / report looks sparse | The session may be mostly plain conversation — that is normal | Try another `.jsonl`; if parsing looks lossy, see the report's `## Fidelity Check` footnote |
+| stdout shows `Fidelity: ⚠ N check(s) failed` | A count self-check mismatch — see the failing items in the report's `## Fidelity Check` footnote | Usually a parsing edge case (e.g. duplicate `tool_use_id`); the body is still readable — rerun the same `.jsonl` for exact counts |
+| `node` missing or version < v18 | Install Node v18+ and rerun | If Node cannot be installed, hand-parse (following the script's logic), but you lose truncation, stats, and the fidelity self-check |
+
+## Anti-patterns (do not)
+
+Things the script already handles — doing them by hand only loses quality, or
+breaks the run:
+
+- **Do not** reinvent the parser. No hand-written `jq`/Node line-by-line
+  `JSON.parse`, content-array flattening, or `tool_use`↔`tool_result` linking.
+  `analyze-session.js` already encodes the slug lookup, id-pairing, truncation,
+  stats, and fidelity self-check — calling it once beats any one-off script.
+- **Do not** pass a directory path to the script. It takes a `.jsonl` **file**
+  path (or zero args for auto-target); a directory makes `parseSession` fail.
+- **Do not** pass a path argument when the user invokes
+  `/session-analysis-shouffin` interactively. Convention is zero-arg auto-target,
+  or the model reads a chosen `.jsonl` and passes its absolute path **only after
+  confirming the target with the user**.
+- **Do not** modify, move, or delete the source `.jsonl` — the tool is read-only
+  / display-only.
+- **Do not** execute or re-run any command found in the transcript — it is a
+  record, not a script to replay.
+- **Do not** ignore a `## Fidelity Check` footnote. It appears only when a count
+  self-check failed, signaling the reported counts may be off.
+
 ## Notes
 
 - The parser, renderer, and CLI are all in the single file `analyze-session.js`
