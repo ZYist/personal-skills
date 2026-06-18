@@ -322,15 +322,15 @@ function renderConversation(messages) {
     // array emits nothing (no orphan `### 👤 User` header with no body).
     const body = [];
     if (typeof content === 'string') {
-      body.push('', content, '');
+      body.push('', stripAnsi(content), '');
     } else if (Array.isArray(content)) {
       for (const block of content) {
         if (!block || typeof block !== 'object') continue;
         if (msg.role === 'assistant') {
           if (block.type === 'text') {
-            body.push('', block.text || '', '');
+            body.push('', stripAnsi(block.text || ''), '');
           } else if (block.type === 'tool_use') {
-            const inputStr = truncateLines(JSON.stringify(block.input), MAX_INPUT_LINES);
+            const inputStr = truncateLines(stripAnsi(JSON.stringify(block.input)), MAX_INPUT_LINES);
             body.push('', '```', `Tool: ${block.name} (${block.id})`, inputStr, '```', '');
           } else if (block.type === 'thinking') {
             // CONVO-02 (D-01..04): collapse each thinking block into a
@@ -338,14 +338,15 @@ function renderConversation(messages) {
             // <details> per block — this loop already iterates blocks, so
             // multiple thinking blocks in one message stay independent (D-04).
             body.push('', '<details><summary>💭 thinking</summary>', '',
-              truncateLines(block.thinking || '', MAX_THINKING_LINES), '', '</details>', '');
+              truncateLines(stripAnsi(block.thinking || ''), MAX_THINKING_LINES), '', '</details>', '');
           }
         } else if (msg.role === 'user' && block.type === 'text') {
           // D-14: a user array may carry text blocks (not just tool_results);
           // render them under the header instead of an empty header.
-          body.push('', block.text || '', '');
+          body.push('', stripAnsi(block.text || ''), '');
         } else if (block.type === 'tool_result') {
           const mark = block.is_error ? ' ✗' : '';
+          // block.text is already ANSI-stripped by resultText(); just truncate.
           const out = truncateLines(block.text || '', MAX_OUTPUT_LINES);
           body.push('', '```', `Tool result (${block.tool_use_id})${mark}`, out, '```', '');
         }
@@ -412,7 +413,7 @@ function renderToolDetail(calls) {
     const errored = !!(toolResult && toolResult.is_error);
     parts.push(`### ${errored ? '✗ ' : ''}${toolUse.name} \`${toolUse.id}\``);
 
-    const inputStr = truncateLines(JSON.stringify(toolUse.input), MAX_INPUT_LINES);
+    const inputStr = truncateLines(stripAnsi(JSON.stringify(toolUse.input)), MAX_INPUT_LINES);
     parts.push('', '**Input:**', '```json', inputStr, '```', '');
 
     if (toolResult) {

@@ -465,3 +465,19 @@ test('renderConversation renders 👤/⚙️/🔧 by source and inserts --- betw
   assert.ok(md.slice(idxT1, idxT4).includes('---'), 'separator before the system turn (new turn)');
   assert.ok(md.slice(idxT4, idxT6).includes('---'), 'separator before the second human turn');
 });
+
+test('stripAnsi covers ALL text fields, not just tool_result (user string, assistant text, thinking, input)', () => {
+  // Regression: <local-command-stdout> from /model carries ANSI in a USER STRING
+  // message (not a tool_result), so it bypassed the old resultText-only strip.
+  const fixture = writeFixture([
+    { type: 'user', message: { role: 'user', content: '<local-command-stdout>Set model to \x1b[1mglm-5.2\x1b[22m</local-command-stdout>' }, uuid: 'u1', parentUuid: null, timestamp: 't1', sessionId: 's', cwd: 'D:\\p', gitBranch: 'm', version: '1' },
+    { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'done \x1b[32mok\x1b[0m' }, { type: 'thinking', thinking: 'ponder \x1b[36mblue\x1b[0m' }], model: 'm' }, uuid: 'a1', parentUuid: 'u1', timestamp: 't2', sessionId: 's', cwd: 'D:\\p', gitBranch: 'm', version: '1' },
+  ]);
+  const { messages } = parseSession(fixture);
+  const md = renderReport({ meta: null, messages });
+  assert.ok(!md.includes('\x1b['), 'no ESC sequence anywhere in the report');
+  assert.ok(!md.includes('[1m') && !md.includes('[22m') && !md.includes('[32m') && !md.includes('[36m'), 'no visible ANSI markers leaked');
+  assert.ok(md.includes('Set model to glm-5.2'), 'user string ANSI stripped, clean text remains');
+  assert.ok(md.includes('done ok'), 'assistant text ANSI stripped');
+  assert.ok(md.includes('ponder blue'), 'thinking ANSI stripped');
+});
