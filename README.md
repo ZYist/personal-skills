@@ -31,3 +31,24 @@ npx skills add ZYist/personal-skills
 ```bash
 npx skills add ZYist/personal-skills --skill docx-shouffin
 ```
+
+## 更新
+
+skill 安装后，后续拉取本仓库的最新版用 `update`（比重跑 `add` 更规范——保留原有 scope/agent 配置，语义也更清晰）：
+
+```bash
+# 更新单个 skill
+npx skills@latest update <skill-name> -g
+
+# 更新全部已安装的 skill
+npx skills@latest update -g
+```
+
+> `-g` = 全局（用户级，最常见）；项目级用 `-p`；或 `-y` 让 CLI 自动判断 scope。
+
+例如：
+
+```bash
+npx skills@latest update session-analysis-shouffin -g
+```
+
