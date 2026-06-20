@@ -59,6 +59,8 @@ description: >
 - 薄壳 ≤ 60 行，包含三件套（路由表 + Auto-Triggers + Red Flags）
 - Cursor 入口的 description 必须与主 SKILL.md 完全一致
 
+**注（skills CLI 生态）**：通过 `npx skills add` 分发时，入口薄壳由 CLI 自动生成，本陷阱主要适用于手动部署到单一 runtime 目录、或需要增强薄壳三件套的场景。
+
 ---
 
 ## 命名：skip-aar — 跳过 AAR 导致知识永不录入

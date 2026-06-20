@@ -28,7 +28,7 @@ description: "Skill 脚手架生成器。Use when 用户要创建一个新的 Ag
 |---|-----------|--------|---------|
 | 1 | ❌ Description 写不好 | skill 不存在（Agent 找不到门） | 按 `workflows/design-description.md` 写 | → `references/gotchas.md#description-fail` |
 | 2 | ❌ 单文件 > 500 行且内容混在一起 | Agent 读不到关键内容 | 严格目录分离 → `references/gotchas.md#monolith-trap` |
-| 3 | ❌ 薄壳缺 GEMINI.md | Gemini 完全失明 | 按模板补全 harness 文件 → `references/gotchas.md#blind-harness` |
+| 3 | ❌ 手动部署缺薄壳 | 非 skills CLI 分发时 Gemini 失明 | skills CLI 自动生成；手动部署则补全 → `references/gotchas.md#blind-harness` |
 | 4 | ❌ "就这一次跳过 AAR" | 知识永远不会录入 | 每次必做 AAR → `references/gotchas.md#skip-aar` |
 | 5 | ❌ 预制内容进 templates | 所有下游项目长得一样 | templates 只放骨架 → `references/gotchas.md#template-overreach` |
 

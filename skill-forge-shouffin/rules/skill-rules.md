@@ -95,6 +95,8 @@ frontmatter（name + description）
 
 缺哪个 harness 入口 = 该 harness 完全失明。
 
+> **skills CLI 生态注**：通过 `npx skills add` 安装时，CLI 自动为每个目标 runtime 生成入口薄壳（GEMINI.md/AGENTS.md/CLAUDE.md 等），skill 仓库源只需维护 SKILL.md。只有手动部署到单一 runtime 目录、或需要超出 CLI 默认入口的增强薄壳（三件套）时，才需手写。
+
 ## 五、任务闭环协议（Task Closure Protocol）
 
 任务完成条件（全部满足前不算完成）：
