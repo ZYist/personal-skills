@@ -168,8 +168,8 @@ def create_sheet(wb: Workbook, sheet_config: dict):
             ws.merge_cells(merge_range)
         except Exception as e:
             print(
-                f"Error: 无效的 merge_cells 范围 '{merge_range}': {e}"
-                "（用 'A1:D1' 左上:右下 格式）",
+                f"Error: 无效的 merge_cells 范围 '{merge_range}' "
+                f"({type(e).__name__}: {e})；用 'A1:D1' 左上:右下 格式",
                 file=sys.stderr,
             )
             sys.exit(1)
