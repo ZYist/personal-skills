@@ -244,6 +244,22 @@ scripts/excel-writer data.json
 # Success: /path/to/data.xlsx
 ```
 
+### 创建失败模式
+
+基于脚本真实错误路径：
+
+| 触发条件 | 一线修复 | 仍失败兜底 |
+|---------|---------|-----------|
+| `Error: Input file not found: <input>.json` | 确认 JSON 路径 | — |
+| `Error: Invalid JSON format: ...` | 检查 JSON 语法（尾逗号 / 引号 / UTF-8） | 用最简 schema 逐步加回 |
+| `Error: 'sheets' array is required and must not be empty` | JSON 必须含非空 `sheets` 数组 | — |
+| `Error: No valid sheet data found` | 每个 sheet 至少提供 `data` 或 `headers` | — |
+| 输出 .xlsx 被 Excel 打开 → **抛完整 Python traceback**（脚本未做异常捕获，非友好 Error） | 关闭 Excel 再重试 | 换输出文件名 |
+| `merge_cells` 写法错（如 `"A1D1"` 缺冒号）→ traceback | 用 `"A1:D1"` 格式（左上:右下） | 删 `merge_cells` 先生成再补 |
+| 数字字符串自动转数字（`"25"`→`25`）非预期 | 该列要纯文本时注意（见反例 #4） | — |
+
+> ⚠️ `excel-writer` 脚本无全局异常捕获：文件被占用、`merge_cells` 格式错等情况会抛完整 Python traceback 而非友好 Error——看到 traceback 时按上表对号入座即可。
+
 ## AI 使用约定
 
 当用户需要将任意数据创建为 Excel 时：
