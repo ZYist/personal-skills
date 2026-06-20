@@ -1,6 +1,6 @@
 ---
 name: skill-forge-shouffin
-description: "Use when 用户要创建一个新的 Agent Skill（从需求明确、description 设计、目录结构决策、文件生成到验证交付），或单独设计 skill 的 description、验证已有 skill 质量。生成符合三要素（Prompt/Context/Harness）、文件夹化、跨工具兼容（CLAUDE.md/GEMINI.md/AGENTS.md 薄壳）的规范 skill。触发词：创建skill、生成skill、写一个skill、skill生成器、skill工厂、create skill、skill scaffold、design description、validate skill"
+description: "Skill 脚手架生成器。Use when 用户要创建一个新的 Agent Skill（设计 description、决定目录结构、生成文件、跨工具薄壳、验证交付），或单独设计 skill 的 description / 验证已有 skill。遵循三要素（Prompt/Context/Harness）+ 严格目录分离 + 跨工具兼容（CLAUDE.md/GEMINI.md/AGENTS.md）。触发词：创建skill、生成skill、写一个skill、skill生成器、skill工厂、create skill、skill scaffold、design description、validate skill"
 ---
 
 # Skill Forge — Skill 生成器

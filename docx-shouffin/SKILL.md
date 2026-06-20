@@ -150,22 +150,6 @@ scripts/docx-write report.md report.docx --style-config .tmp/docx-style.json
 }
 ```
 
-### 创建失败模式
-
-基于脚本真实错误路径（均以 exit 1 + stderr 退出）：
-
-| 触发条件 | 一线修复 | 仍失败兜底 |
-|---------|---------|-----------|
-| `Error: File not found: <input>.md` | 确认 .md 路径，优先用绝对路径 | 源文件被移走，重新生成 |
-| `Error: Unsupported format: .txt. Only .md is supported.` | 源文件改后缀 / 另存为 .md | — |
-| `Error: Style config not found: <file>.json`（`--style-config`） | 确认 JSON 路径 | 去掉 `--style-config`，用默认样式 |
-| `Error: Image file not found: <img>.png`（Markdown 引用图片） | 图片路径相对 **.md 文件所在目录**（非 cwd），放对位置 | 图片缺失则从 Markdown 删该引用再生成 |
-| `Error: Expecting value...`（样式 JSON 语法错） | 检查尾逗号 / 引号 / UTF-8 编码 | 先用默认样式，逐项加回定位错处 |
-| `Error: ... codec ...` / UnicodeDecodeError | 源 .md 非 UTF-8，用编辑器另存为 UTF-8 | — |
-| `Error: [Errno 13] Permission denied`（输出 .docx 被占用） | 关闭正在打开它的 Word | 换一个输出文件名 |
-
-> ⚠️ 图片相对路径是最常踩的坑：脚本按 `.md 文件所在目录` 解析图片 src，不是按当前工作目录（cwd）。
-
 ## AI 使用约定
 
 若用户没有直接提供 Markdown，而是要求生成一份 docx 报告：
@@ -238,3 +222,7 @@ Error: Invalid JSON in style config
 ### 图片提取失败
 
 如果 docx 中的图片格式不常见（如 EMF/WMF），可能无法提取。脚本会跳过这些图片并在输出中标注。
+
+### 创建时图片找不到（Image file not found）
+
+从 Markdown 创建 docx 时，脚本按 **.md 文件所在目录**（非当前工作目录 cwd）解析图片相对路径。报 `Error: Image file not found: <path>` 时，把图片放到 .md 同级目录，或修正 Markdown 中的相对路径。

@@ -244,22 +244,6 @@ scripts/excel-writer data.json
 # Success: /path/to/data.xlsx
 ```
 
-### 创建失败模式
-
-基于脚本真实错误路径：
-
-| 触发条件 | 一线修复 | 仍失败兜底 |
-|---------|---------|-----------|
-| `Error: Input file not found: <input>.json` | 确认 JSON 路径 | — |
-| `Error: Invalid JSON format: ...` | 检查 JSON 语法（尾逗号 / 引号 / UTF-8） | 用最简 schema 逐步加回 |
-| `Error: 'sheets' array is required and must not be empty` | JSON 必须含非空 `sheets` 数组 | — |
-| `Error: No valid sheet data found` | 每个 sheet 至少提供 `data` 或 `headers` | — |
-| 输出 .xlsx 被 Excel 打开 → **抛完整 Python traceback**（脚本未做异常捕获，非友好 Error） | 关闭 Excel 再重试 | 换输出文件名 |
-| `merge_cells` 写法错（如 `"A1D1"` 缺冒号）→ traceback | 用 `"A1:D1"` 格式（左上:右下） | 删 `merge_cells` 先生成再补 |
-| 数字字符串自动转数字（`"25"`→`25`）非预期 | 该列要纯文本时注意（见反例 #4） | — |
-
-> ⚠️ `excel-writer` 脚本无全局异常捕获：文件被占用、`merge_cells` 格式错等情况会抛完整 Python traceback 而非友好 Error——看到 traceback 时按上表对号入座即可。
-
 ## AI 使用约定
 
 当用户需要将任意数据创建为 Excel 时：
@@ -346,8 +330,8 @@ cd packages/excel && uv sync
 
 ### 文件被占用（创建）
 
-```
-Error: Permission denied: /path/to/output.xlsx
-```
+目标文件被 Excel 打开时，`excel-writer` 脚本无全局异常捕获，会抛完整 Python traceback（`PermissionError: [Errno 13] ...`），而非友好的 Error 消息。关闭 Excel 后重试，或换一个输出文件名。`merge_cells` 写法错误（如 `"A1D1"` 缺冒号）同理会抛 traceback——用 `"A1:D1"`（左上:右下）格式。
 
-目标文件可能被 Excel 或其他程序打开。关闭后重试。
+### 编号 / 工号丢失前导零（数据类型自动转换）
+
+`"007"`、`"001"` 这类纯数字字符串会被自动转成数字 `7`、`1`（脚本对纯数字串强制 int/float 转换）。需要保留前导零的编号列，目前脚本不提供 per-cell 类型锁定——生成后可在 Excel 手动将该列格式改为"文本"。

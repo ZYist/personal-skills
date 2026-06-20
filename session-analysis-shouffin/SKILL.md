@@ -45,20 +45,9 @@ argument.
 
 ## 🔴 CHECKPOINT — confirm the target session before parsing
 
-The zero-config path (newest `.jsonl` in the current project) runs without
-asking. But whenever the target is ambiguous or user-chosen, **STOP and
-confirm first**:
-
-- 🛑 User wants a session that isn't the newest? List candidate `.jsonl` files
-  (with mtime + size) and let the user pick — never silently guess.
-- 🛑 "No sessions found" in cwd? The slug is derived from cwd — confirm you're
-  in the right project dir before assuming the project has no history.
-- 🛑 User points at a `.jsonl` by path? Echo the absolute path back and confirm
-  it's the intended one before parsing.
-
-Parsing is read-only and cheap, but the **report you hand back must match the
-session the user meant** — confirming the target once avoids a report about the
-wrong conversation.
+The zero-config path (newest `.jsonl`) runs without asking; but if the target
+is ambiguous or user-chosen, **STOP and confirm it first** (symptoms & fixes
+in [Troubleshooting](#troubleshooting-failure-modes) below).
 
 ## Output
 
