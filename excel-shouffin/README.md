@@ -9,7 +9,7 @@
 ## 调用方式
 
 ```
-/excel-shouffin    ← 在 Claude Code 中直接输入
+/excel-shouffin    ← Claude Code 输入 slash command;其他 AI CLI(Gemini/Codex/Cursor/Copilot)直接描述需求即可触发
 ```
 
 触发词（说任意一句即可）：
