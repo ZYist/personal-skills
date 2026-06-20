@@ -42,9 +42,11 @@ def estimate_width(text: str) -> float:
     return width
 
 
-def convert_value(value):
+def convert_value(value, force_text=False):
     if value is None:
         return None
+    if force_text:
+        return value if isinstance(value, str) else str(value)
     if isinstance(value, bool):
         return value
     if isinstance(value, (int, float)):
@@ -89,6 +91,7 @@ def create_sheet(wb: Workbook, sheet_config: dict):
     data = sheet_config.get("data", [])
     column_widths = sheet_config.get("column_widths")
     merge_cells = sheet_config.get("merge_cells", [])
+    text_columns = set(sheet_config.get("text_columns", []))
 
     num_cols = get_num_cols(sheet_config)
     current_row = 1
@@ -118,7 +121,7 @@ def create_sheet(wb: Workbook, sheet_config: dict):
     for row_idx, row_data in enumerate(data):
         for col_idx, raw_value in enumerate(row_data, 1):
             cell = ws.cell(row=current_row, column=col_idx)
-            cell.value = convert_value(raw_value)
+            cell.value = convert_value(raw_value, force_text=col_idx in text_columns)
             is_alt = row_idx % 2 == 1
             apply_cell_style(
                 cell,
@@ -161,7 +164,15 @@ def create_sheet(wb: Workbook, sheet_config: dict):
         ws.freeze_panes = "A2"
 
     for merge_range in merge_cells:
-        ws.merge_cells(merge_range)
+        try:
+            ws.merge_cells(merge_range)
+        except Exception as e:
+            print(
+                f"Error: 无效的 merge_cells 范围 '{merge_range}': {e}"
+                "（用 'A1:D1' 左上:右下 格式）",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     return ws
 
@@ -222,7 +233,18 @@ def main():
         print("Error: No valid sheet data found", file=sys.stderr)
         sys.exit(1)
 
-    wb.save(output_path)
+    try:
+        wb.save(output_path)
+    except PermissionError as e:
+        print(
+            f"Error: 输出文件被占用或不可写: {output_path}",
+            file=sys.stderr,
+        )
+        print(
+            f"  请关闭正在打开它的 Excel,或换一个输出文件名。原始错误: {e}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     print(f"Success: {output_path}")
 
 

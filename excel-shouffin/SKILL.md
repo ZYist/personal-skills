@@ -162,6 +162,7 @@ scripts/excel-writer.ps1 <input.json> [output.xlsx]
 | `data` | sheet | 是* | 二维数组，每行一个数据行 |
 | `column_widths` | sheet | 否 | 列宽数组；不指定时自动根据内容计算 |
 | `merge_cells` | sheet | 否 | 合并单元格范围数组，如 `["A1:D1"]` |
+| `text_columns` | sheet | 否 | 强制按文本处理的列索引数组（1-based），如 `[1, 3]`；这些列不做数字自动转换，保留前导零（如工号 `007`） |
 
 > *`data` 和 `headers` 至少提供一个，否则该 sheet 会被跳过。
 
@@ -173,6 +174,8 @@ JSON 中的值会自动转换为 Excel 原生类型：
 - 纯文本 → Excel 文本
 - `null` → 空单元格
 - 布尔值 → Excel 布尔值
+
+> 需要保留前导零的编号列（如工号 `"007"`），在该 sheet 配置 `text_columns`（1-based 列索引数组）声明，跳过数字转换。
 
 ### 默认样式
 
@@ -330,8 +333,14 @@ cd packages/excel && uv sync
 
 ### 文件被占用（创建）
 
-目标文件被 Excel 打开时，`excel-writer` 脚本无全局异常捕获，会抛完整 Python traceback（`PermissionError: [Errno 13] ...`），而非友好的 Error 消息。关闭 Excel 后重试，或换一个输出文件名。`merge_cells` 写法错误（如 `"A1D1"` 缺冒号）同理会抛 traceback——用 `"A1:D1"`（左上:右下）格式。
+目标文件被 Excel 打开时，脚本输出友好错误 `Error: 输出文件被占用或不可写: <path>` 并退出（exit 1）。关闭 Excel 后重试，或换一个输出文件名。`merge_cells` 写法错误（如 `"A1D1"` 缺冒号）同样输出 `Error: 无效的 merge_cells 范围 ...` 并退出——用 `"A1:D1"`（左上:右下）格式。
 
 ### 编号 / 工号丢失前导零（数据类型自动转换）
 
-`"007"`、`"001"` 这类纯数字字符串会被自动转成数字 `7`、`1`（脚本对纯数字串强制 int/float 转换）。需要保留前导零的编号列，目前脚本不提供 per-cell 类型锁定——生成后可在 Excel 手动将该列格式改为"文本"。
+`"007"`、`"001"` 这类纯数字字符串默认会被自动转成数字 `7`、`1`。需要保留前导零时，在该 sheet 配置 `text_columns`（1-based 列索引数组）跳过数字转换：
+
+```json
+{ "headers": ["工号", "姓名"], "data": [["007", "张三"]], "text_columns": [1] }
+```
+
+配置后工号列保持文本 `007`。
