@@ -1,6 +1,6 @@
 ---
 name: session-analysis-shouffin
-description: "Analyzes a local Claude Code session transcript (.jsonl) and writes a readable Markdown report — a chronological conversation replay plus full tool-call detail. Invoke when the user wants to review what happened in a session (what was said and which tools were called), summarize a past session, or audit tool usage. Zero-config: analyzes the current project's most recent session by default."
+description: "Analyzes a local Claude Code session transcript (.jsonl) and writes a readable Markdown report — a chronological conversation replay plus full tool-call detail. Use when the user wants to review what happened in a session (what was said and which tools were called), summarize a past session, or audit tool usage. Zero-config: analyzes the current project's most recent session by default. 触发词：分析上次会话、看看上个 session 干了什么、整理这段对话、审计工具调用、analyze last session、what happened in that conversation."
 ---
 
 # Session Analyst
@@ -42,6 +42,23 @@ To analyze a session other than the most recent one, the model should read the
 target `.jsonl` from `~/.claude/projects/` and decide whether further processing
 is needed based on the conversation context, rather than passing a path
 argument.
+
+## 🔴 CHECKPOINT — confirm the target session before parsing
+
+The zero-config path (newest `.jsonl` in the current project) runs without
+asking. But whenever the target is ambiguous or user-chosen, **STOP and
+confirm first**:
+
+- 🛑 User wants a session that isn't the newest? List candidate `.jsonl` files
+  (with mtime + size) and let the user pick — never silently guess.
+- 🛑 "No sessions found" in cwd? The slug is derived from cwd — confirm you're
+  in the right project dir before assuming the project has no history.
+- 🛑 User points at a `.jsonl` by path? Echo the absolute path back and confirm
+  it's the intended one before parsing.
+
+Parsing is read-only and cheap, but the **report you hand back must match the
+session the user meant** — confirming the target once avoids a report about the
+wrong conversation.
 
 ## Output
 
