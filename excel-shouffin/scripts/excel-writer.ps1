@@ -34,6 +34,7 @@ if ($args.Count -eq 0) {
     Write-Host "  data           - Required: 2D array of cell values"
     Write-Host "  column_widths  - Optional: array of column widths"
     Write-Host "  merge_cells    - Optional: array of merge ranges"
+    Write-Host "  text_columns   - Optional: 1-based col indices forced as text (preserve leading zeros)"
     exit 1
 }
 
