@@ -48,11 +48,14 @@ JSON 格式：
       "title": "标题",
       "headers": ["列1", "列2"],
       "data": [["值1", "值2"]],
-      "column_widths": [15, 20]
+      "column_widths": [15, 20],
+      "text_columns": []
     }
   ]
 }
 ```
+
+字段 `text_columns`：可选，1-based 列索引数组，强制按文本处理（保留前导零，如工号 `007`）。
 
 ## 依赖
 
