@@ -675,7 +675,7 @@ def build_style_overrides(args: argparse.Namespace) -> dict:
     return merge_style_config(DEFAULT_STYLE, overrides)
 
 
-def parse_write_options(argv: list[str]) -> dict:
+def _build_write_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="main.py write")
     parser.add_argument("input_md")
     parser.add_argument("output_docx", nargs="?")
@@ -686,7 +686,11 @@ def parse_write_options(argv: list[str]) -> dict:
         parser.add_argument(f"--h{level}-font")
         parser.add_argument(f"--h{level}-size", type=float)
     parser.add_argument("--image-max-width", type=float)
-    args = parser.parse_args(argv)
+    return parser
+
+
+def parse_write_options(argv: list[str]) -> dict:
+    args = _build_write_parser().parse_args(argv)
     return build_style_overrides(args)
 
 
@@ -723,17 +727,7 @@ def handle_read_command(file_path: str, output_dir: str | None) -> int:
 
 
 def handle_write_command(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(prog="main.py write")
-    parser.add_argument("input_md")
-    parser.add_argument("output_docx", nargs="?")
-    parser.add_argument("--style-config")
-    parser.add_argument("--body-font")
-    parser.add_argument("--body-size", type=float)
-    for level in (1, 2, 3, 4, 5, 6):
-        parser.add_argument(f"--h{level}-font")
-        parser.add_argument(f"--h{level}-size", type=float)
-    parser.add_argument("--image-max-width", type=float)
-    args = parser.parse_args(argv)
+    args = _build_write_parser().parse_args(argv)
 
     input_md = Path(args.input_md)
     if not input_md.exists():

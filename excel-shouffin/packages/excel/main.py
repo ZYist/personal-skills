@@ -5,6 +5,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+# Monkey-patch openpyxl 的序列描述符转换：读取某些 xlsx 时 _convert 会抛 TypeError
+# （序列约束校验失败），patch 后返回 None 容错，避免整个读取崩溃。
+# 注意：这是 openpyxl 内部行为的 workaround，升级 openpyxl 后若读取正常可评估移除。
 from openpyxl.descriptors import sequence as _sequence_module
 
 _original_convert = _sequence_module._convert  # type: ignore[attr-defined]
