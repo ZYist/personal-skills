@@ -1,0 +1,32 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - docx-shouffin/packages/docx
+          - excel-shouffin/packages/excel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv --directory ${{ matrix.package }} sync --default-index https://pypi.org/simple
+      - run: uv --directory ${{ matrix.package }} run ruff check .
+      - run: uv --directory ${{ matrix.package }} run pytest -q
+
+  node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --test
+        working-directory: session-analysis-shouffin
