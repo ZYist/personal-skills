@@ -80,3 +80,17 @@ def test_cli_style_overrides_json_config(tmp_path: Path):
 
     assert parsed["body"]["size"] == 12
     assert parsed["headings"]["1"]["size"] == 22
+
+
+def test_handle_write_command_missing_file_returns_1(tmp_path, capsys):
+    from main import handle_write_command
+
+    assert handle_write_command([str(tmp_path / "nope.md")]) == 1
+    assert "not found" in capsys.readouterr().err.lower()
+
+
+def test_handle_write_command_non_md_returns_1(tmp_path, capsys):
+    from main import handle_write_command
+
+    (tmp_path / "f.txt").write_text("x", encoding="utf-8")
+    assert handle_write_command([str(tmp_path / "f.txt")]) == 1

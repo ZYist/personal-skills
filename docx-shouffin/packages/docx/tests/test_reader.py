@@ -24,3 +24,17 @@ def test_docx_to_markdown_preserves_heading_and_formatting(tmp_path: Path):
     assert "# 测试标题" in markdown
     assert "**加粗**" in markdown
     assert "*斜体*" in markdown
+
+
+def test_handle_read_command_missing_file_returns_1(tmp_path, capsys):
+    from main import handle_read_command
+
+    assert handle_read_command(str(tmp_path / "nope.docx"), str(tmp_path / "out")) == 1
+    assert "not found" in capsys.readouterr().err.lower()
+
+
+def test_handle_read_command_non_docx_returns_1(tmp_path, capsys):
+    from main import handle_read_command
+
+    (tmp_path / "f.txt").write_text("x", encoding="utf-8")
+    assert handle_read_command(str(tmp_path / "f.txt"), str(tmp_path / "out")) == 1
