@@ -4,12 +4,13 @@ Shouffin 的个人 Agent Skill 仓库，兼容 [Agent Skills](https://agentskill
 
 ## Skill 列表
 
-| Skill | 说明 |
-|-------|------|
-| `docx-shouffin` | 读取和创建 Word 文档（.docx），支持 Markdown 互转 |
-| `excel-shouffin` | 读取和创建 Excel 文件（.xlsx/.xlsm），支持 Markdown/JSON 格式互转 |
-| `skill-forge-shouffin` | Skill 脚手架生成器，快速创建新的 Agent Skill |
-| `session-analysis-shouffin` | 解析本地 Claude Code 会话记录（.jsonl），生成可读 Markdown 报告（对话回放 + 工具调用明细） |
+| Skill | 说明 | 作者 |
+|-------|------|------|
+| `docx-shouffin` | 读取和创建 Word 文档（.docx），支持 Markdown 互转 | Shouffin |
+| `excel-shouffin` | 读取和创建 Excel 文件（.xlsx/.xlsm），支持 Markdown/JSON 格式互转 | Shouffin |
+| `skill-forge-shouffin` | Skill 脚手架生成器，快速创建新的 Agent Skill | Shouffin |
+| `session-analysis-shouffin` | 解析本地 Claude Code 会话记录（.jsonl），生成可读 Markdown 报告（对话回放 + 工具调用明细） | Shouffin |
+| `darwin-skill` | Skill 自动优化器，基于 9 维度评估体系持续改进 Agent Skills（v2.0 集成 Microsoft SkillLens + SkillOpt） | [花叔 Huashu](https://github.com/alchaincyf) |
 
 ## 安装
 
