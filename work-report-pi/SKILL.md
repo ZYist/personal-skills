@@ -1,11 +1,6 @@
 ---
 name: work-report-pi
-description: >
-  Use when the user wants to generate a daily work report (日报) or weekly
-  report (周报) summarizing activities from the local pi session cache and
-  DingTalk records. Output to terminal only — never submits to DingTalk.
-  Activate when user says "日报", "写日报", "今日工作", "今天干了啥",
-  "生成日报", "写周报", "周报", "总结今天的工作", "daily report".
+description: "生成日报/周报（汇总本机 pi 会话缓存 + 钉钉记录），仅终端输出不提交钉钉。Use when the user wants to generate a daily work report (日报) or weekly report (周报) summarizing activities from the local pi session cache and DingTalk records. Output to terminal only — never submits to DingTalk. 触发词：日报、写日报、今日工作、今天干了啥、生成日报、写周报、周报、总结今天的工作、daily report"
 ---
 
 # Daily Report (pi) — 日报/周报生成(仅终端输出)
